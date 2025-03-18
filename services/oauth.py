@@ -47,3 +47,23 @@ def exchange_code_for_token(code):
     else:
         st.error(f"Error exchanging code for token: {response.text}")
         return None
+def get_access_token(code):
+    TOKEN_URL = st.secrets["TOKEN_URL"]
+    data = {
+        "code": code,
+        "client_id": st.secrets["INOREADER_CLIENT_ID"],
+        "client_secret": st.secrets["INOREADER_CLIENT_SECRET"],
+        "redirect_uri": st.secrets["REDIRECT_URI"],
+        "grant_type": "authorization_code"
+    }
+
+    # Make the POST request to get the access token
+    response = requests.post(TOKEN_URL, data=data)
+    
+    if response.status_code == 200:
+        access_token = response.json().get("access_token")
+        st.session_state["access_token"] = access_token
+        st.success("Successfully authorized!")
+        # You can now use the access token to make API requests
+    else:
+        st.error(f"Failed to exchange code for token: {response.json()}")
