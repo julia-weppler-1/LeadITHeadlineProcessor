@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 import zipfile
 from services import oauth
+import uuid
 
 
 def load_header():
@@ -145,7 +146,7 @@ def upload_file(temp_dir):
 
         # Ensure state is stored before authentication
         if "inoreader_state" not in st.session_state:
-            st.session_state["inoreader_state"] = oauth.generate_state()
+            st.session_state["inoreader_state"] = str(uuid.uuid4())
 
         # Generate authorization URL
         auth_url = oauth.get_inoreader_auth_url(state=st.session_state["inoreader_state"])
