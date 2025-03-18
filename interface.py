@@ -142,28 +142,42 @@ def upload_file(temp_dir):
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
-        auth_url = oauth.get_inoreader_auth_url()
-        st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
-        # Callback handling
-        params = st.query_params()
-        code = params.get("code")
-        state = params.get("state")
 
-        # Validate state to protect against CSRF attacks
-        if state != [st.session_state.get("inoreader_state")]:
-            st.error("State mismatch! Possible CSRF attack detected.")
-        else:
-            if code:
-                # If we have the authorization code, exchange it for an access token
-                access_token = oauth.exchange_code_for_token(code[0])
-                if access_token:
-                    # You can now use the access token to make requests to Inoreader API
-                    st.session_state["inoreader_access_token"] = access_token
-                else:
-                    st.error("Failed to get access token.")
+        # Ensure state is stored before authentication
+        if "inoreader_state" not in st.session_state:
+            st.session_state["inoreader_state"] = oauth.generate_state()
+
+        # Generate authorization URL
+        auth_url = oauth.get_inoreader_auth_url(state=st.session_state["inoreader_state"])
+        st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
+
+        # Handle OAuth callback
+        params = st.query_params()
+        code = params.get("code", [None])[0]  # Extract code safely
+        state = params.get("state", [None])[0]  # Extract state safely
+
+        if code and state:
+            expected_state = st.session_state.get("inoreader_state")
+
+            if expected_state is None:
+                st.error("No state stored in session. Try reloading the app.")
+            elif state != expected_state:
+                st.error("State mismatch! Possible CSRF attack detected.")
             else:
-                st.error("Authorization code not found in the URL.")
-    
+                # Exchange authorization code for access token
+                access_token = oauth.exchange_code_for_token(code)
+                if access_token:
+                    st.session_state["inoreader_access_token"] = access_token
+                    
+                    # Clear query params and rerun to remove `code` from the URL
+                    st.query_params.clear()
+                    st.success("Successfully connected to Inoreader! ✅")
+                    st.experimental_rerun()
+                else:
+                    st.error("Failed to obtain access token.")
+
+
+        
 
 
 
