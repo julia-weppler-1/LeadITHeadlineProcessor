@@ -145,7 +145,7 @@ def upload_file(temp_dir):
         auth_url = oauth.get_inoreader_auth_url()
         st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
         # Callback handling
-        params = st.experimental_get_query_params()
+        params = st.query_params()
         code = params.get("code")
         state = params.get("state")
 
