@@ -53,7 +53,7 @@ import time
 import traceback
 from urllib.parse import urlencode, urlparse, parse_qs
 import webbrowser
-
+import secrets
 
 def get_resource_path(relative_path):
     """
@@ -217,6 +217,7 @@ def main(gpt_analyzer, openai_apikey):
     total_start_time = time.time()
     
     json_path = get_resource_path(gpt_analyzer.json[0])
+        
     
     try:
         headlines = parse_json_feed(json_path)
@@ -265,6 +266,9 @@ def main(gpt_analyzer, openai_apikey):
 
 
 if __name__ == "__main__":
+    if "oauth_state" not in st.session_state:
+                        print("Called")
+                        st.session_state["oauth_state"] = secrets.token_urlsafe(16)
     try:
         with TemporaryDirectory() as temp_dir:
             logo_path = os.path.join(os.path.dirname(__file__), "public", "logo2.jpg")
@@ -276,6 +280,7 @@ if __name__ == "__main__":
             with centered_div:
                 tab1, tab2, tab3 = st.tabs(["Tool", "About", "FAQ"])
                 with tab1:
+                    
                     build_interface(temp_dir)
                     if st.button("Run", disabled=st.session_state.get("run_disabled", False)):
                         gpt_analyzer = get_user_inputs()

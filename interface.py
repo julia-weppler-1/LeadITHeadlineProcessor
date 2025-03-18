@@ -9,6 +9,7 @@ import zipfile
 from services import oauth
 
 
+
 def load_header():
     logo_path = os.path.join(os.path.dirname(__file__), "public", "logo.png")
     with open(logo_path, "rb") as image_file:
@@ -142,36 +143,38 @@ def upload_file(temp_dir):
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
-        
-        # Generate authorization URL
-        auth_url = oauth.get_inoreader_auth_url()
-        if "token" not in st.session_state:
-            st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
-        else:
-        # Handle OAuth callback
-            params = st.query_params()
-            code = params.get("code", [None])[0]  # Extract code safely
-            state = params.get("state", [None])[0]  # Extract state safely
 
-            if code and state:
-                expected_state = st.session_state.get("inoreader_state")
+        # Use st.query_params (the new API)
+        query_params = st.query_params
 
-                if state != expected_state:
-                    st.error("State mismatch! Possible CSRF attack detected.")
+        if "code" in query_params and "state" in query_params:
+            returned_state = query_params["state"]
+            stored_state = st.session_state.get("oauth_state")
+            st.write("Returned state:", returned_state)
+            st.write("Stored state:", stored_state)
+            if returned_state != stored_state:
+                st.error("State parameter mismatch. Potential CSRF attack detected.")
+            else:
+                auth_code = query_params["code"][0]
+                token = oauth.exchange_code_for_token(auth_code)
+                if token:
+                    st.session_state.access_token = token["access_token"]
+                    st.session_state.refresh_token = token.get("refresh_token")
+                    st.success("Successfully authenticated with Inoreader!")
+                    # Clear query params so they don't interfere with subsequent runs
+                    st.experimental_set_query_params()
                 else:
-                    # Exchange authorization code for access token
-                    access_token = oauth.exchange_code_for_token(code)
-                    if access_token:
-                        st.session_state["inoreader_access_token"] = access_token
-                        
-                        # Remove `code` and `state` from URL and rerun
-                        st.query_params.clear()
-                        st.success("Successfully connected to Inoreader! ✅")
-                        st.experimental_rerun()
-                    else:
-                        st.error("Failed to obtain access token.")
-            elif code and not state:
-                st.error("Missing state parameter! Authorization may not be secure.")
+                    st.error("Failed to exchange token.")
+            st.experimental_set_query_params()
+            st.experimental_rerun()
+        else:
+            # Only show the authorization link if no callback parameters are present
+            auth_url = oauth.get_authorization_url()  # Your function to build the URL
+            st.markdown(f'<a href="{auth_url}" target="_self">Authorize with Inoreader</a>', unsafe_allow_html=True)
+
+        
+
+
         
 
 

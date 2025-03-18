@@ -2,11 +2,11 @@ import streamlit as st
 import requests
 
 def fetch_inoreader_articles():
-    if "access_token" not in st.session_state:
+    if "inoreader_access_token" not in st.session_state:
         st.error("You need to log in to Inoreader first.")
         return []
 
-    headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+    headers = {"Authorization": f"Bearer {st.session_state['inoreader_access_token']}"}
     response = requests.get("https://www.inoreader.com/reader/api/0/stream/contents", headers=headers)
 
     if response.status_code == 200:
