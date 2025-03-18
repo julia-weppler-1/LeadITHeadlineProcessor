@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import streamlit as st
 import zipfile
+from services import oauth
 
 
 def load_header():
@@ -140,9 +141,10 @@ def upload_file(temp_dir):
         else:
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
-        st.markdown(
-        "More soon."
-        )
+        st.subheader("Authorize Inoreader Access")
+
+        auth_url = oauth.get_inoreader_auth_url()
+        st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
     
 
 
