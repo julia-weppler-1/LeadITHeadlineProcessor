@@ -142,9 +142,27 @@ def upload_file(temp_dir):
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
-
         auth_url = oauth.get_inoreader_auth_url()
         st.markdown(f"[Click here to authorize with Inoreader]({auth_url})", unsafe_allow_html=True)
+        # Callback handling
+        params = st.experimental_get_query_params()
+        code = params.get("code")
+        state = params.get("state")
+
+        # Validate state to protect against CSRF attacks
+        if state != [st.session_state.get("inoreader_state")]:
+            st.error("State mismatch! Possible CSRF attack detected.")
+        else:
+            if code:
+                # If we have the authorization code, exchange it for an access token
+                access_token = oauth.exchange_code_for_token(code[0])
+                if access_token:
+                    # You can now use the access token to make requests to Inoreader API
+                    st.session_state["inoreader_access_token"] = access_token
+                else:
+                    st.error("Failed to get access token.")
+            else:
+                st.error("Authorization code not found in the URL.")
     
 
 
