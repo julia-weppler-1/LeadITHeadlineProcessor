@@ -11,6 +11,7 @@ from services import oauth
 
 
 def load_header():
+    st.write("Query Parameters:", st.query_params())
     logo_path = os.path.join(os.path.dirname(__file__), "public", "logo.png")
     with open(logo_path, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode()
