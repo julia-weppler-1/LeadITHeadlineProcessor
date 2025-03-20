@@ -34,6 +34,8 @@ def load_text():
     st.markdown("""## Submit your processing request""")
 
 def upload_file(temp_dir):
+    st.write("Query Parameters:", st.query_params())
+
     st.subheader("I. Choose Your Input Method")
     # Track active tab in session state
     query_params = st.query_params 
