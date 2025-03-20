@@ -36,28 +36,47 @@ def load_text():
 def upload_file(temp_dir):
     st.subheader("I. Choose Your Input Method")
     # Track active tab in session state
-    if "active_tab" not in st.session_state:
-        st.session_state["active_tab"] = "JSON File"
+    query_params = st.query_params 
+    if "state" in query_params:
+        default_tab = "Connect to Inoreader"
+    else:
+        default_tab = "JSON File"
 
-    # Use radio buttons instead of tabs to enforce exclusivity
-    active_tab = st.radio(
+    if "active_tab" not in st.session_state:
+        st.session_state["active_tab"] = default_tab
+
+    active_tab_radio = st.radio(
         "Select analysis type:", 
         ["JSON File", "Connect to Inoreader"],
+        index=["JSON File", "Connect to Inoreader"].index(st.session_state["active_tab"]),
+        key="active_tab_radio",
         horizontal=True,
         help="""Select **JSON File** if using tool for the first time on a selection of downloaded news articles from an RSS app. 
         **Connect to Inoreader** may be run on an existing Inoreader stream."""
-        )
+    )
 
-    if active_tab != st.session_state["active_tab"]:
+    # Detect if the tab has changed
+    if active_tab_radio != st.session_state["active_tab"]:
         # Clear any previous uploads when switching tabs
         st.session_state["json"] = []
         st.session_state["selected_json"] = []
         st.session_state["temp_zip_path"] = None
         st.session_state["run_disabled"] = True  # Prevent running with no files
 
-    st.session_state["active_tab"] = active_tab  # Update session state
+    # Update the active_tab value in session state
+    st.session_state["active_tab"] = active_tab_radio
+    active_tab = active_tab_radio
 
-    json = []  # Store uploaded JSON file paths
+    if active_tab != st.session_state["active_tab"]:
+        # Clear any previous uploads when switching tabs
+        st.session_state["json"] = []
+        st.session_state["selected_json"] = []
+        st.session_state["temp_zip_path"] = None
+        st.session_state["run_disabled"] = True  
+
+    st.session_state["active_tab"] = active_tab 
+
+    json = []  
     if active_tab == "JSON File":
         uploaded_file = st.file_uploader(
             "Upload a **single JSON** file exported from your Inoreader feed (download folder as JSON)",
@@ -143,34 +162,35 @@ def upload_file(temp_dir):
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
-
-        # Use st.query_params (the new API)
-        query_params = st.query_params
+        print(query_params)
+        stored_state = st.session_state.get("oauth_state")
+        print("Stored state:", stored_state)
 
         if "code" in query_params and "state" in query_params:
             returned_state = query_params["state"]
-            stored_state = st.session_state.get("oauth_state")
-            st.write("Returned state:", returned_state)
-            st.write("Stored state:", stored_state)
+            print("Returned state:", returned_state)
             if returned_state != stored_state:
                 st.error("State parameter mismatch. Potential CSRF attack detected.")
             else:
-                auth_code = query_params["code"][0]
+                auth_code = query_params["code"]
                 token = oauth.exchange_code_for_token(auth_code)
                 if token:
                     st.session_state.access_token = token["access_token"]
                     st.session_state.refresh_token = token.get("refresh_token")
                     st.success("Successfully authenticated with Inoreader!")
-                    # Clear query params so they don't interfere with subsequent runs
-                    st.experimental_set_query_params()
+                    print(oauth.fetch_inoreader_data())
+                    # Clear query params after successful exchange
+                    st.query_params()
                 else:
                     st.error("Failed to exchange token.")
-            st.experimental_set_query_params()
+            st.query_params()
             st.experimental_rerun()
         else:
-            # Only show the authorization link if no callback parameters are present
-            auth_url = oauth.get_authorization_url()  # Your function to build the URL
+            auth_url = oauth.get_authorization_url()
             st.markdown(f'<a href="{auth_url}" target="_self">Authorize with Inoreader</a>', unsafe_allow_html=True)
+
+
+
 
         
 

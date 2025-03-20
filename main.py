@@ -266,9 +266,11 @@ def main(gpt_analyzer, openai_apikey):
 
 
 if __name__ == "__main__":
-    if "oauth_state" not in st.session_state:
-                        print("Called")
-                        st.session_state["oauth_state"] = secrets.token_urlsafe(16)
+    query_params = st.query_params
+    if "state" in query_params and "code" in query_params:
+        st.session_state["oauth_state"] = query_params["state"]
+    elif "oauth_state" not in st.session_state:
+        st.session_state["oauth_state"] = secrets.token_urlsafe(16)
     try:
         with TemporaryDirectory() as temp_dir:
             logo_path = os.path.join(os.path.dirname(__file__), "public", "logo2.jpg")

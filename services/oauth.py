@@ -1,17 +1,17 @@
-# In services/oauth.py
-import secrets
-import urllib.parse
-import streamlit as st
 import requests
+import streamlit as st
+import urllib.parse
+import secrets
 
 CLIENT_ID = st.secrets["oauth_client_id"]
 CLIENT_SECRET = st.secrets["inoreader_key"]
-REDIRECT_URI = "http://localhost:8501/"
-AUTHORIZATION_URL = "https://www.inoreader.com/oauth2/auth"
-TOKEN_URL = "https://www.inoreader.com/oauth2/token"
+REDIRECT_URI = st.secrets["redirect_uri"]
+AUTHORIZATION_URL = st.secrets["authorization_url"]
+TOKEN_URL = st.secrets["token_url"]
 SCOPE = "read"
 
 def get_authorization_url():
+    # Use the already-stored oauth_state
     state = st.session_state.get("oauth_state")
     params = {
         "client_id": CLIENT_ID,
@@ -21,7 +21,6 @@ def get_authorization_url():
         "state": state,
     }
     return f"{AUTHORIZATION_URL}?{urllib.parse.urlencode(params)}"
-
 
 def exchange_code_for_token(auth_code):
     data = {
@@ -39,10 +38,12 @@ def exchange_code_for_token(auth_code):
         return None
 
 def fetch_inoreader_data():
-    headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
+    headers = {
+        "Authorization": f"Bearer {st.session_state.access_token}",
+    }
     response = requests.get("https://www.inoreader.com/reader/api/0/user-info", headers=headers)
     if response.status_code == 200:
         return response.json()
     else:
-        st.error(f"Error fetching data: {response.text}")
+        st.error(f"Error fetching data from Inoreader: {response.text}")
         return None

@@ -5,7 +5,7 @@ import pandas as pd
 def new_openai_session(openai_apikey):
     os.environ["OPENAI_API_KEY"] = openai_apikey
     client = OpenAI()
-    gpt_model = "gpt-4o"  # "o1-preview"
+    gpt_model = "gpt-4o" 
     max_num_chars = 25000
     return client, gpt_model, max_num_chars
 
