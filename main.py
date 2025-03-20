@@ -283,8 +283,8 @@ if __name__ == "__main__":
             with centered_div:
                 tab1, tab2, tab3 = st.tabs(["Tool", "About", "FAQ"])
                 with tab1:
-                    st.write("Query Parameters:", st.experimental_get_query_params())
                     build_interface(temp_dir)
+                    st.write("Query Parameters:", st.experimental_get_query_params())
                     if st.button("Run", disabled=st.session_state.get("run_disabled", False)):
                         gpt_analyzer = get_user_inputs()
                         with st.spinner("Generating output document..."):
