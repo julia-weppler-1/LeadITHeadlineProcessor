@@ -34,8 +34,6 @@ def load_text():
     st.markdown("""## Submit your processing request""")
 
 def upload_file(temp_dir):
-    st.write("Query Parameters:", st.query_params)
-
     st.subheader("I. Choose Your Input Method")
     # Track active tab in session state
     query_params = st.query_params 
@@ -189,7 +187,7 @@ def upload_file(temp_dir):
             st.experimental_rerun()
         else:
             auth_url = oauth.get_authorization_url()
-            st.markdown(f'<a href="{auth_url}" target="_self">Authorize with Inoreader</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{auth_url}" ">Authorize with Inoreader</a>', unsafe_allow_html=True)
 
 
 
