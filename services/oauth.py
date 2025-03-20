@@ -12,7 +12,9 @@ SCOPE = "read"
 
 def get_authorization_url():
     # Use the already-stored oauth_state
+    print("Getting auth url")
     state = st.session_state.get("oauth_state")
+    print(state)
     params = {
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
@@ -23,6 +25,7 @@ def get_authorization_url():
     return f"{AUTHORIZATION_URL}?{urllib.parse.urlencode(params)}"
 
 def exchange_code_for_token(auth_code):
+    print("Exchanging code for token")
     data = {
         "code": auth_code,
         "client_id": CLIENT_ID,
@@ -30,7 +33,9 @@ def exchange_code_for_token(auth_code):
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code",
     }
+    print(data)
     response = requests.post(TOKEN_URL, data=data)
+    print(response)
     if response.status_code == 200:
         return response.json()
     else:
