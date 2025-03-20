@@ -2,6 +2,9 @@ import requests
 import streamlit as st
 import urllib.parse
 import secrets
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 CLIENT_ID = st.secrets["oauth_client_id"]
 CLIENT_SECRET = st.secrets["inoreader_key"]
@@ -12,9 +15,9 @@ SCOPE = "read"
 
 def get_authorization_url():
     # Use the already-stored oauth_state
-    print("Getting auth url")
+    logger.info("Getting auth url")
     state = st.session_state.get("oauth_state")
-    print(state)
+    logger.info(state)
     params = {
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
@@ -25,7 +28,7 @@ def get_authorization_url():
     return f"{AUTHORIZATION_URL}?{urllib.parse.urlencode(params)}"
 
 def exchange_code_for_token(auth_code):
-    print("Exchanging code for token")
+    logger.info("Exchanging code for token")
     data = {
         "code": auth_code,
         "client_id": CLIENT_ID,
@@ -33,9 +36,9 @@ def exchange_code_for_token(auth_code):
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code",
     }
-    print(data)
+    logger.info(data)
     response = requests.post(TOKEN_URL, data=data)
-    print(response)
+    logger.info(response)
     if response.status_code == 200:
         return response.json()
     else:
