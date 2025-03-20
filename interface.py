@@ -187,7 +187,7 @@ def upload_file(temp_dir):
             st.experimental_rerun()
         else:
             auth_url = oauth.get_authorization_url()
-            st.markdown(f'<a href="{auth_url}" ">Authorize with Inoreader</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{auth_url}" >Authorize with Inoreader</a>', unsafe_allow_html=True)
 
 
 
