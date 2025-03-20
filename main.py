@@ -267,6 +267,7 @@ def main(gpt_analyzer, openai_apikey):
 
 if __name__ == "__main__":
     query_params = st.query_params
+
     if "state" in query_params and "code" in query_params:
         st.session_state["oauth_state"] = query_params["state"]
     elif "oauth_state" not in st.session_state:
@@ -282,7 +283,7 @@ if __name__ == "__main__":
             with centered_div:
                 tab1, tab2, tab3 = st.tabs(["Tool", "About", "FAQ"])
                 with tab1:
-                    
+                    st.write("Query Parameters:", st.experimental_get_query_params())
                     build_interface(temp_dir)
                     if st.button("Run", disabled=st.session_state.get("run_disabled", False)):
                         gpt_analyzer = get_user_inputs()
