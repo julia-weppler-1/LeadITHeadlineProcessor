@@ -12,4 +12,5 @@ docx
 pandas
 newspaper3k
 openpyxl
-lxml
+lxmlxml==4.9.3
+python==3.9.13
