@@ -12,3 +12,4 @@ docx
 pandas
 newspaper3k
 openpyxl
+lxml
