@@ -10,8 +10,8 @@ streamlit
 tiktoken
 docx
 pandas
+lxml_html_clean
+lxml==4.9.3
 newspaper3k
 openpyxl
-lxml==4.9.3
 python==3.9.13
-lxml[html_clean]
