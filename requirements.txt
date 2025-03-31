@@ -14,4 +14,3 @@ lxml_html_clean
 lxml==4.9.3
 newspaper3k
 openpyxl
-python==3.9.13
