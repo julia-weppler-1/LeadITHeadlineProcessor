@@ -32,16 +32,17 @@ from interface import (
 )
 from tabs.about import about_tab
 from tabs.faq import faq_tab
-from services.query_gpt import new_openai_session, query_gpt_for_relevance
+from services.query_gpt import new_openai_session, query_gpt_for_relevance, query_gpt_for_relevance_iterative
+from site_text.questions import STEEL_YES, STEEL_NO, IRON_YES, IRON_NO
 from utils.read_pdf import extract_text_chunks_from_pdf
 from utils.read_docx import extract_text_chunks_from_docx
 from utils.read_json import parse_json_feed
+from services.inoreader import build_df_for_folder, fetch_full_article_text
 from utils.relevant_excerpts import (
-    generate_all_embeddings,
-    embed_variable_specifications,
-    find_top_relevant_texts,
+    find_top_relevant_texts
 )
-from utils.results import format_output_doc, get_output_fname, output_results, output_metrics
+from utils.results import format_output_doc, get_output_fname, output_results, output_results_excel  
+
 
 from docx import Document
 from tempfile import TemporaryDirectory
@@ -51,8 +52,6 @@ import requests
 import streamlit as st
 import time
 import traceback
-from urllib.parse import urlencode, urlparse, parse_qs
-import webbrowser
 import secrets
 
 def get_resource_path(relative_path):
@@ -212,53 +211,85 @@ def main(gpt_analyzer, openai_apikey):
     Returns:
         The total number of articles processed.
     """
-    output_doc = Document()
-    format_output_doc(output_doc, gpt_analyzer)
-    total_start_time = time.time()
-    
-    json_path = get_resource_path(gpt_analyzer.json[0])
-        
-    
-    try:
-        headlines = parse_json_feed(json_path)
-        print(f"Parsed {len(headlines)} headlines from JSON.")
-    except Exception as e:
-        print(f"Failed to parse JSON: {e}")
-        return 0
 
+    total_start_time = time.time()
+    if st.session_state["active_tab"] == "JSON File":
+        json_path = get_resource_path(gpt_analyzer.json[0])
+        try:
+            headlines = parse_json_feed(json_path)
+            print(f"Parsed {len(headlines)} headlines from JSON.")
+        except Exception as e:
+            print(f"Failed to parse JSON: {e}")
+            return 0
+    else:
+        try:
+            headlines = build_df_for_folder("LeadIT-Iron")
+            json_path = "Inoreader"
+            print(headlines)
+            print(f"Parsed {len(headlines)} headlines from JSON.")
+        except Exception as e:
+            print(f"Failed to parse JSON: {e}")
+            return 0
     openai_client, gpt_model, _ = new_openai_session(openai_apikey)
     
     # Convert headlines into a DataFrame with necessary text column
     headlines["text_column"] = headlines["title"] + " " + headlines.get("summary", "")
-    
-    # Query GPT for relevance
-    relevance_df = query_gpt_for_relevance(
+    folder = "LeadIT-Iron"
+    print("Folder", folder)
+    if folder == "LeadIT-Steel":
+        target_questions = STEEL_NO
+    elif folder == "LeadIT-Iron":
+        target_questions = IRON_NO
+    else:
+        target_questions = []  # or some default
+    print("Target q's", target_questions)
+    # Assuming your DataFrame of articles is in `headlines` and you have run_on_full_text defined
+    relevance_df = query_gpt_for_relevance_iterative(
         gpt_analyzer,
         headlines,
-        gpt_analyzer.variable_specs,
-        run_on_full_text=True,  # Assuming full text processing
+        target_questions,
+        run_on_full_text=True,  # or False, as applicable
         gpt_client=openai_client,
-        gpt_model=gpt_model,
+        gpt_model=gpt_model
     )
     # Process relevant results for output
+    # After obtaining relevance_df from query_gpt_for_relevance_iterative:
     relevant_articles = []
+    irrelevant_articles = []
+
     for _, row in relevance_df.iterrows():
-        relevant_vars = {var: row[var] for var in gpt_analyzer.variable_specs if row[var]}
-        print("REL VARS", relevant_vars)
-        if relevant_vars:
+        article_index = row["index"]
+        article_row = headlines.loc[article_index]
+        title = article_row["title"]
+        url = article_row["url"]
+
+        # full_text = fetch_full_article_text(article_row)
+        if row["relevant"] != "no":
             relevant_articles.append({
-                "title": headlines.loc[row["index"], "title"],
-                "relevant": list(relevant_vars.values())[0]
+                "title": title,
+                "url": url
             })
-    
-    print(f"Relevant Articles: {relevant_articles}")
-    
-    # Output results
-    output_results(gpt_analyzer, output_doc, json_path, relevant_articles)
+        else:
+            irrelevant_articles.append({
+                "title": title,
+                "url": url
+            })
+
+    print(f"Total relevant articles: {len(relevant_articles)}")
+    print(f"Total irrelevant articles: {len(irrelevant_articles)}")
+
+    # Define output file name and path
+    output_fname = get_output_fname(get_resource_path, filetype="xlsx")
+    print(f"Saving Excel file to {output_fname}")
+
+    # Use the new Excel output function
+    output_results_excel(relevant_articles, irrelevant_articles, output_fname)
+
+    # Optionally, display or notify the user that the file has been created
+    display_output(output_fname)
     print_milestone("Done processing headlines", total_start_time, {"Number of articles": len(relevant_articles)})
     
     output_fname = get_output_fname(get_resource_path)
-    output_doc.save(output_fname)
     display_output(output_fname)
     
     return len(relevant_articles)

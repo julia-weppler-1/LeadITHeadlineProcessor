@@ -14,10 +14,11 @@ Functions:
 from datetime import datetime
 from docx.shared import Pt
 import os
+import pandas as pd
 
 
 # Function to generate the output file name based on the provided path function and file type
-def get_output_fname(path_fxn, filetype="docx"):
+def get_output_fname(path_fxn, filetype="xlsx"):
     return path_fxn(f"results.{filetype}")
 
 
@@ -113,3 +114,84 @@ def output_metrics(doc, num_docs, t, num_pages, failed_pdfs):
     )
     if len(failed_pdfs) > 0:
         doc.add_heading(f"Unable to process the following PDFs: {failed_pdfs}", 4)
+
+
+def output_results_excel(relevant_articles, irrelevant_articles, output_path):
+    """
+    Writes the results into an Excel file with two worksheets:
+      - 'Relevant' for articles flagged as relevant.
+      - 'Irrelevant' for articles flagged as irrelevant.
+
+    The 'Relevant' sheet has the specified columns:
+       Internal ID, Justification, Project name, ...
+       ... (plus all the columns you listed) ...
+       References 1
+
+    The 'Irrelevant' sheet has two columns: [title, url].
+    """
+
+    # 1. Define the exact column order for the "Relevant" sheet:
+    relevant_cols = [
+        "Internal ID", 
+        "Justification",
+        "Project name",
+        "Project scale",
+        "Year to be online",
+        "Technology to be used",
+        "Company",
+        "Company type",
+        "Project type",
+        "Company has climate goals?",
+        "Production plant",
+        "Updated GEM Plant ID",
+        "GEM wiki page link",
+        "Location",
+        "Latitude",
+        "Longitude",
+        "Coordinate accuracy",
+        "Continent",
+        "Country",
+        "[ref] Location",
+        "Iron production capacity (million tonnes per year)",
+        "Steel production capacity (million tonnes per year)",
+        "States iron & steel capacity?",
+        "[ref] Iron or steel capacity",
+        "Hydrogen generation capacity (MW)",
+        "States CC & H2 capacity?",
+        "[ref] CC or H2 capacity",
+        "[ref] Investment",
+        "Business proposed",
+        "Project status",
+        "Year construction began",
+        "Actual start year",
+        "[ref] Date of announcement",
+        "Comments",
+        "Lastest project news (yyyy-mm-dd)",
+        "Lastly updated (yyyy-mm-dd)",
+        "References 1",
+        "Reference Article"
+    ]
+
+    # 2. Build a DataFrame for relevant articles with the columns above.
+    #    We'll place the article's 'title' into "Project name"
+    #    and the article's 'url' into "References 1".
+    #    Everything else is left blank (or "").
+    relevant_rows = []
+    for article in relevant_articles:
+        row_data = {col: "" for col in relevant_cols}  # blank row
+        row_data["Reference Article"] = article.get("title", "")
+        row_data["References 1"] = article.get("url", "")
+        relevant_rows.append(row_data)
+
+    df_relevant = pd.DataFrame(relevant_rows, columns=relevant_cols)
+
+    # 3. Build a DataFrame for irrelevant articles with simple columns: "title", "url".
+    df_irrelevant = pd.DataFrame(irrelevant_articles, columns=["title", "url"])
+
+    # 4. Write both DataFrames to an Excel file with two sheets.
+    #    Make sure you have openpyxl or xlsxwriter installed.
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df_relevant.to_excel(writer, sheet_name="Relevant", index=False)
+        df_irrelevant.to_excel(writer, sheet_name="Irrelevant", index=False)
+
+    print(f"Excel saved to: {output_path}")

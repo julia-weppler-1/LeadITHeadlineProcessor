@@ -8,6 +8,7 @@ import streamlit as st
 import zipfile
 from services import oauth
 import logging
+from services import inoreader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -106,71 +107,21 @@ def upload_file(temp_dir):
                 # Disable the subset checkbox if only one PDF is uploaded
                 st.session_state["max_files"] = None
                 st.session_state["file_select_label"] = "No need to select subset for analysis."
-                checked = False  # Automatically set the "Run on subset" checkbox to off
-            else:
-                if "max_files" not in st.session_state:
-                    st.session_state["max_files"] = 3
-                if "file_select_label" not in st.session_state:
-                    st.session_state["file_select_label"] = "Select 1-3 subfiles to run on"
-
-                checked = st.checkbox(
-                    "Run on subset",
-                    value=True,
-                    help="Do not turn this off until you are ready for your final run.",
-                )
-
-            if checked:
-                st.session_state["run_disabled"] = False  # Enable run if subset is selected
-                fnames = {os.path.basename(p): p for p in json}
-                first = os.path.basename(json[0])
-                selected_fnames = st.multiselect(
-                    st.session_state["file_select_label"],
-                    fnames.keys(),
-                    default=[first],
-                    max_selections=st.session_state["max_files"],
-                )
-                st.session_state["selected_json"] = [
-                    fnames[selected_fname] for selected_fname in selected_fnames
-                ]
-            else:
-                if len(json) > 1: # If not checked to run on subset and there is more than 1 PDF
-                    passcode = st.text_input("Enter passcode", type="password")
-                    if passcode:
-                        apikey_ids = {
-                            st.secrets["access_password"]: "openai_apikey",
-                            st.secrets["access_password_adis"]: "openai_apikey_adis",
-                            st.secrets["access_password_sharone"]: "openai_apikey_sharone",
-                            st.secrets["access_password_bb"]: "openai_apikey_bb",
-                        }
-                        if passcode in apikey_ids:
-                            st.session_state["apikey_id"] = apikey_ids[passcode]
-                            st.session_state["is_test_run"] = False
-                            st.session_state["max_files"] = None
-                            st.session_state["file_select_label"] = (
-                                "Select any number of PDFs to analyze. Or, uncheck 'Run on Subset' to analyze all uploaded PDFs"
-                            )
-                            st.session_state["run_disabled"] = False  # Enable Run button
-                            st.success("Access granted. All PDFs in the zip-file will be processed. Please proceed.", icon="✅")
-                        else:
-                            st.session_state["run_disabled"] = True
-                            st.error("Incorrect password. Click 'Run on subset' above. The 1-3 documents specified will be processed.", icon="❌")
-                    else:
-                        st.session_state["run_disabled"] = True  
-                        st.error("You need a passcode to proceed. If you do not have one, please select 'Run on subset' above.", icon="❌")
-                else: # If not checks and there is 1 PDF, we don't need a passcode
-                    st.session_state["selected_json"] = [json[0]]
-                    st.session_state["run_disabled"] = False  # Enable Run if only one PDF
+            st.session_state["selected_json"] = [json[0]]
+            st.session_state["run_disabled"] = False  # Enable Run if only one PDF
         else:
             st.warning("Please upload a single JSON file.", icon="⚠️")
     elif active_tab == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
-        print(query_params)
+        query_params = st.query_params 
         stored_state = st.session_state.get("oauth_state")
-        print("Stored state:", stored_state)
-
+        
+        # Initialize target_folder if not already present.
+        if "target_folder" not in st.session_state:
+            st.session_state["target_folder"] = ""
+        
         if "code" in query_params and "state" in query_params:
             returned_state = query_params["state"]
-            print("Returned state:", returned_state)
             if returned_state != stored_state:
                 st.error("State parameter mismatch. Potential CSRF attack detected.")
             else:
@@ -180,17 +131,42 @@ def upload_file(temp_dir):
                     st.session_state.access_token = token["access_token"]
                     st.session_state.refresh_token = token.get("refresh_token")
                     st.success("Successfully authenticated with Inoreader!")
-                    print(oauth.fetch_inoreader_data())
-                    # Clear query params after successful exchange
-                    st.query_params()
+                    
+                    # Use a text input with its own key so its value is stored in a separate widget key.
+                    folder_input = st.text_input(
+                        "Target Folder", 
+                        value=st.session_state["target_folder"], 
+                        key="target_folder_input", 
+                        help="Enter the target folder name from Inoreader (e.g., LeadIT-Iron)"
+                    )
+                    
+                    # Use a button to trigger article fetching.
+                    if st.button("Fetch Articles", key="fetch_articles_button"):
+                        if folder_input.strip():
+                            # Update the target folder in session state.
+                            st.session_state["target_folder"] = folder_input.strip()
+                            articles = inoreader.fetch_inoreader_articles(folder_input.strip())
+                            st.session_state["json"] = articles
+                            st.session_state["selected_json"] = articles
+                            st.session_state["run_disabled"] = False
+                            st.session_state["inoreader_authenticated"] = True
+                            st.success(f"Fetched {len(articles)} articles from folder '{folder_input.strip()}'.")
+                            # Optionally, you may delay or remove the experimental rerun while debugging:
+                            st.experimental_rerun()
+                        else:
+                            st.error("Please enter a valid target folder.")
                 else:
                     st.error("Failed to exchange token.")
-            st.query_params()
-            st.experimental_rerun()
         else:
             auth_url = oauth.get_authorization_url()
-            logger.info("URL:", auth_url)
             st.markdown(f'<a href="{auth_url}">Authorize with Inoreader</a>', unsafe_allow_html=True)
+
+
+
+
+
+
+
 
 
 
@@ -241,7 +217,7 @@ def clear_variables():
 def input_data_specs():
     st.markdown("")
     st.subheader("III. Specify Variables to Extract from Headlines")
-    
+
     st.markdown(
         "**Type-in variable details or copy-and-paste from an excel spreadsheet (3 columns, no headers).**"
     )
@@ -285,6 +261,35 @@ def process_table():
 
 
 
+# def build_interface(tmp_dir):
+#     if "task_type" not in st.session_state:
+#         st.session_state["task_type"] = "Headline extraction"
+#     if "is_test_run" not in st.session_state:
+#         st.session_state["is_test_run"] = True
+#     load_text()
+#     upload_file(tmp_dir)
+#     input_main_query()
+#     if "output_format_options" not in st.session_state:
+#         st.session_state["output_format_options"] = {
+#             "Sort by quotes; each quote will be one row": "quotes_sorted",
+#             "Simply return GPT responses for each variable": "quotes_gpt_resp",
+#             "Sort by quotes labelled with variable_name and subcategories": "quotes_sorted_and_labelled",
+#             "Return list of quotes per variable": "quotes_structured",
+#         }
+#     if "json" not in st.session_state:
+#         st.session_state["json"] = "no_upload"
+#     if "schema_input_format" not in st.session_state:
+#         st.session_state["schema_input_format"] = "Manual Entry"
+#     if "output_format" not in st.session_state:
+#         st.session_state["output_format"] = list(
+#             st.session_state["output_format_options"].keys()
+#         )[1]
+#     if "custom_output_fmt" not in st.session_state:
+#         st.session_state["custom_output_fmt"] = None
+#     if "output_detail_df" not in st.session_state:
+#         st.session_state["output_detail_df"] = None
+#     input_data_specs()
+#     st.divider()
 def build_interface(tmp_dir):
     if "task_type" not in st.session_state:
         st.session_state["task_type"] = "Headline extraction"
@@ -292,7 +297,9 @@ def build_interface(tmp_dir):
         st.session_state["is_test_run"] = True
     load_text()
     upload_file(tmp_dir)
+    # Call input_main_query unconditionally to populate section II.
     input_main_query()
+    # If output_format_options isn’t set, initialize it.
     if "output_format_options" not in st.session_state:
         st.session_state["output_format_options"] = {
             "Sort by quotes; each quote will be one row": "quotes_sorted",
@@ -300,26 +307,26 @@ def build_interface(tmp_dir):
             "Sort by quotes labelled with variable_name and subcategories": "quotes_sorted_and_labelled",
             "Return list of quotes per variable": "quotes_structured",
         }
+    # If no JSON is set, default to "no_upload".
     if "json" not in st.session_state:
         st.session_state["json"] = "no_upload"
     if "schema_input_format" not in st.session_state:
         st.session_state["schema_input_format"] = "Manual Entry"
     if "output_format" not in st.session_state:
-        st.session_state["output_format"] = list(
-            st.session_state["output_format_options"].keys()
-        )[1]
+        st.session_state["output_format"] = list(st.session_state["output_format_options"].keys())[1]
     if "custom_output_fmt" not in st.session_state:
         st.session_state["custom_output_fmt"] = None
     if "output_detail_df" not in st.session_state:
         st.session_state["output_detail_df"] = None
+    # Unconditionally call input_data_specs to populate section III.
     input_data_specs()
     st.divider()
 
-
 def get_user_inputs():
     json = st.session_state["json"]
-    if st.session_state["is_test_run"]:
-        json = st.session_state["selected_json"]
+
+    # if st.session_state["is_test_run"]:
+    #     json = st.session_state["selected_json"]
     main_query = st.session_state["main_query_input"]
     variable_specs = process_table()
     task_type = st.session_state["task_type"]
@@ -335,14 +342,14 @@ def get_user_inputs():
     )
 
 
-def display_output(docx_fname):
-    with open(docx_fname, "rb") as f:
+def display_output(xlsx_fname):
+    with open(xlsx_fname, "rb") as f:
         binary_file = f.read()
         st.download_button(
             label="Download Results",
             data=binary_file,
-            file_name="results.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            file_name="results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
 

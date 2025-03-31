@@ -1,12 +1,13 @@
 from openai import OpenAI
 import os
 import pandas as pd
+import string
 
 def new_openai_session(openai_apikey):
     os.environ["OPENAI_API_KEY"] = openai_apikey
     client = OpenAI()
     gpt_model = "gpt-4o" 
-    max_num_chars = 25000
+    max_num_chars = 10
     return client, gpt_model, max_num_chars
 
 
@@ -47,6 +48,7 @@ def fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text
 def query_gpt_for_relevance(
     gpt_analyzer, df, variable_specs, run_on_full_text, gpt_client, gpt_model
 ):
+    print("Variable specs", variable_specs)
     print("Querying each element in the dataframe...")
 
     results = []
@@ -62,7 +64,7 @@ def query_gpt_for_relevance(
             response = fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text)
             
             # Ensure response is stripped and standardized
-            response_cleaned = response.strip().lower()
+            response_cleaned = response.strip().lower().translate(str.maketrans('', '', string.punctuation))
             if response_cleaned not in ["yes", "no"]:
                 response_cleaned = "no"  # Default to "no" if unexpected response
             
@@ -70,4 +72,39 @@ def query_gpt_for_relevance(
         
         results.append(row_results)
 
+    return pd.DataFrame(results)
+
+def query_gpt_for_relevance_iterative(gpt_analyzer, df, target_questions, run_on_full_text, gpt_client, gpt_model):
+    """
+    Iterates through target_questions for each article in df.
+    For each article, it asks each question until one returns "yes".
+    If any question returns "yes", the article is marked as irrelevant ("no").
+    Otherwise, it's marked as relevant ("yes").
+    
+    Returns:
+        pd.DataFrame: A DataFrame with one row per article including the article index, title, and a "relevant" flag.
+    """
+    results = []
+    for index, row in df.iterrows():
+        is_irrelevant = False
+        for question in target_questions:
+            query = (
+                f'Forget all previous instructions. Answer this question to the best of your ability: {question}. '
+                f'Please respond with only "yes" or "no". Here is the headline: {row["text_column"]}'
+            )
+            resp_fmt = gpt_analyzer.resp_format_type()
+            response = fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text)
+            response_cleaned = response.strip().lower().translate(str.maketrans('', '', string.punctuation))
+            print(response_cleaned)
+            if response_cleaned not in ["yes", "no"]:
+                response_cleaned = "no"
+            if response_cleaned == "yes":
+                is_irrelevant = True
+                print("Skipping article due to query: ", query)
+                break
+        results.append({
+            "index": index,
+            "title": row.get("title", "Unknown Title"),
+            "relevant": "no" if is_irrelevant else "yes"
+        })
     return pd.DataFrame(results)

@@ -10,3 +10,5 @@ streamlit
 tiktoken
 docx
 pandas
+newspaper3k
+openpyxl
