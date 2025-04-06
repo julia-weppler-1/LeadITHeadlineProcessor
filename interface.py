@@ -11,6 +11,7 @@ import logging
 from services import inoreader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# from services.onedrive import exchange_code_for_token, get_authorization_url
 
 
 def load_header():
@@ -35,6 +36,30 @@ def load_text():
 
     st.markdown(instructions)
     st.markdown("""## Submit your processing request""")
+# def display_onedrive_auth():
+
+#     st.sidebar.header("Microsoft OneDrive Authorization")
+    
+#     # Process query parameters to see if Microsoft redirected back with a code.
+#     query_params = st.experimental_get_query_params()
+#     if "code" in query_params:
+#         auth_code = query_params["code"][0]
+#         token_response = exchange_code_for_token(auth_code)
+#         if token_response and "access_token" in token_response:
+#             st.session_state["onedrive_token"] = token_response["access_token"]
+#             st.sidebar.success("OneDrive Authorized!")
+#         else:
+#             st.sidebar.error("Failed to obtain OneDrive token.")
+#     else:
+#         if "onedrive_token" not in st.session_state or not st.session_state["onedrive_token"]:
+#             st.sidebar.write("Click below to authorize OneDrive.")
+#             if st.sidebar.button("Authorize OneDrive"):
+#                 auth_url = get_authorization_url()
+#                 st.sidebar.markdown(f"[Sign in with Microsoft]({auth_url})", unsafe_allow_html=True)
+#         else:
+#             st.sidebar.success("OneDrive already authorized.")
+
+
 
 def upload_file(temp_dir):
     st.subheader("I. Choose Your Input Method")

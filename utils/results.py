@@ -15,7 +15,7 @@ from datetime import datetime
 from docx.shared import Pt
 import os
 import pandas as pd
-
+from utils.validate_results import get_check_results_flag
 
 # Function to generate the output file name based on the provided path function and file type
 def get_output_fname(path_fxn, filetype="xlsx"):
@@ -115,23 +115,22 @@ def output_metrics(doc, num_docs, t, num_pages, failed_pdfs):
     if len(failed_pdfs) > 0:
         doc.add_heading(f"Unable to process the following PDFs: {failed_pdfs}", 4)
 
-
 def output_results_excel(relevant_articles, irrelevant_articles, output_path):
     """
-    Writes the results into an Excel file with two worksheets:
-      - 'Relevant' for articles flagged as relevant.
-      - 'Irrelevant' for articles flagged as irrelevant.
-
-    The 'Relevant' sheet has the specified columns:
-       Internal ID, Justification, Project name, ...
-       ... (plus all the columns you listed) ...
-       References 1
-
-    The 'Irrelevant' sheet has two columns: [title, url].
+    Writes the results into an Excel file with three worksheets:
+      - 'Relevant Stage 1': Articles flagged as relevant by the headline but with insufficient extracted core details.
+           (Contains only the article title and URL.)
+      - 'Relevant Stage 2': Articles flagged as relevant by the headline that contain at least a project name and a company.
+           (Includes extra columns such as Project name, Project scale, Year to be online, Technology to be used,
+            Company, Potential Partners, Continent, Country, Project status, and a "Check Results" column.)
+      - 'Irrelevant': Articles deemed irrelevant.
     """
 
-    # 1. Define the exact column order for the "Relevant" sheet:
-    relevant_cols = [
+    # Define simple columns for Stage 1 and Irrelevant sheets.
+    simple_cols = ["title", "url"]
+
+    # Define detailed columns for the Relevant Stage 2 sheet.
+    detailed_cols = [
         "Internal ID", 
         "Justification",
         "Project name",
@@ -139,19 +138,18 @@ def output_results_excel(relevant_articles, irrelevant_articles, output_path):
         "Year to be online",
         "Technology to be used",
         "Company",
+        "Potential Partners",
         "Company type",
         "Project type",
         "Company has climate goals?",
         "Production plant",
         "Updated GEM Plant ID",
         "GEM wiki page link",
-        "Location",
         "Latitude",
         "Longitude",
         "Coordinate accuracy",
         "Continent",
         "Country",
-        "[ref] Location",
         "Iron production capacity (million tonnes per year)",
         "Steel production capacity (million tonnes per year)",
         "States iron & steel capacity?",
@@ -169,29 +167,86 @@ def output_results_excel(relevant_articles, irrelevant_articles, output_path):
         "Lastest project news (yyyy-mm-dd)",
         "Lastly updated (yyyy-mm-dd)",
         "References 1",
-        "Reference Article"
+        "Reference Article",
+        "Check Results"  # New column for validation flag
     ]
 
-    # 2. Build a DataFrame for relevant articles with the columns above.
-    #    We'll place the article's 'title' into "Project name"
-    #    and the article's 'url' into "References 1".
-    #    Everything else is left blank (or "").
-    relevant_rows = []
+    # First, filter out articles that have been flagged as irrelevant via the "irrelevant" key.
+    newly_irrelevant = []
+    filtered_relevant_articles = []
     for article in relevant_articles:
-        row_data = {col: "" for col in relevant_cols}  # blank row
+        if article.get("irrelevant"):  # If flagged as irrelevant by the secondary query.
+            newly_irrelevant.append(article)
+        else:
+            filtered_relevant_articles.append(article)
+    print(newly_irrelevant)
+    # Append newly flagged articles to the existing irrelevant_articles list.
+    irrelevant_articles.extend(newly_irrelevant)
+
+    # Now, separate the remaining relevant articles into Stage 1 and Stage 2.
+    # Stage 2 requires that both 'company' and 'project_name' are non-empty.
+    stage1_articles = []  # Articles with insufficient details.
+    stage2_articles = []  # Articles with both 'company' and 'project_name' provided.
+    for article in filtered_relevant_articles:
+        if article.get("company", "").strip() and article.get("project_name", "").strip():
+            stage2_articles.append(article)
+        else:
+            stage1_articles.append(article)
+
+    print("Stage 1 articles:", stage1_articles)
+    print("Stage 2 articles:", stage2_articles)
+
+    # Build DataFrame for "Relevant Stage 1" (only title and URL).
+    df_stage1 = pd.DataFrame(stage1_articles, columns=simple_cols)
+
+    # Helper function to build a detailed row for a Stage 2 article.
+    def build_detailed_row(article):
+        row_data = {col: "" for col in detailed_cols}
+        # Core details.
+        row_data["Project name"] = article.get("project_name", "")
+        row_data["Project scale"] = article.get("scale", "")
+        row_data["Year to be online"] = article.get("timeline", "")
+        row_data["Technology to be used"] = article.get("technology", "")
+        # Additional details.
+        row_data["Company"] = article.get("company", "")
+        row_data["Potential Partners"] = article.get("partners", "")
+        row_data["Continent"] = article.get("continent", "")
+        row_data["Country"] = article.get("country", "")
+        row_data["Project status"] = article.get("project_status", "")
+        # Basic article info.
         row_data["Reference Article"] = article.get("title", "")
         row_data["References 1"] = article.get("url", "")
-        relevant_rows.append(row_data)
+        
+        # Use the full article text (if available) for fuzzy-checking.
+        print("full text", article["full_text"])
+        if "full_text" in article and article["full_text"]:
+            core_extracted = {
+                "project_name": article.get("project_name", ""),
+                "scale": article.get("scale", ""),
+                "timeline": article.get("timeline", ""),
+                "technology": article.get("technology", "")
+            }
+            flag, scores = get_check_results_flag(core_extracted, article["full_text"])
+            row_data["Check Results"] = flag
+        else:
+            row_data["Check Results"] = ""
+        return row_data
 
-    df_relevant = pd.DataFrame(relevant_rows, columns=relevant_cols)
+    # Build DataFrame for "Relevant Stage 2".
+    detailed_rows = [build_detailed_row(article) for article in stage2_articles]
+    print("Detailed rows:", detailed_rows)
+    df_stage2 = pd.DataFrame(detailed_rows, columns=detailed_cols)
 
-    # 3. Build a DataFrame for irrelevant articles with simple columns: "title", "url".
-    df_irrelevant = pd.DataFrame(irrelevant_articles, columns=["title", "url"])
+    # Build DataFrame for "Irrelevant" articles.
+    df_irrelevant = pd.DataFrame(irrelevant_articles, columns=simple_cols)
+    print("Irrelevant DataFrame:", df_irrelevant)
+    print("Detailed DataFrame:", df_stage2)
+    print("Simple DataFrame:", df_stage1)
 
-    # 4. Write both DataFrames to an Excel file with two sheets.
-    #    Make sure you have openpyxl or xlsxwriter installed.
+    # Write all DataFrames to an Excel file with three sheets.
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        df_relevant.to_excel(writer, sheet_name="Relevant", index=False)
+        df_stage1.to_excel(writer, sheet_name="Relevant Stage 1", index=False)
+        df_stage2.to_excel(writer, sheet_name="Relevant Stage 2", index=False)
         df_irrelevant.to_excel(writer, sheet_name="Irrelevant", index=False)
 
     print(f"Excel saved to: {output_path}")

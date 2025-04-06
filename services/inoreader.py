@@ -24,7 +24,7 @@ def fetch_inoreader_articles(folder_name):
     url = f"https://www.inoreader.com/reader/api/0/stream/contents/{stream_id}"
     
     # Set parameters to filter for items published since one week ago
-    params = {"ot": one_week_ago}
+    params = {"n": 1}
     
     response = requests.get(url, headers=headers, params=params)
 
@@ -41,19 +41,38 @@ def build_df_for_folder(folder_name):
     return(df)
 
 def resolve_with_playwright(url):
+    print("here", url)
     with sync_playwright() as p:
+        print("creating browser")
         browser = p.chromium.launch(headless=True)
+        print("creating page")
         page = browser.new_page()
-        page.goto(url, wait_until="networkidle")  # waiting for network idle can catch JS redirects
-        # Optionally wait a few extra seconds if needed:
-        # page.wait_for_timeout(2000)
+        
+        # Optionally block resources that aren't needed to speed up loading.
+        def block_resource(route, request):
+            if request.resource_type in ["image", "stylesheet", "font"]:
+                return route.abort()
+            return route.continue_()
+        page.route("**/*", block_resource)
+        
+        try:
+            # Use a faster waiting criterion and a shorter timeout.
+            page.goto(url, wait_until="networkidle", timeout=15000)
+            # Wait a bit for any possible redirect (adjust if necessary)
+            page.wait_for_timeout(1000)
+            print("went to page")
+        except Exception as e:
+            print(f"Error during page.goto: {e}")
+            # Optionally, you could try a fallback here
         final_url = page.url
         browser.close()
         return final_url
+
 def fetch_full_article_text(row):
     # Try to get URL from summary content first
-    ino_url = row.get("url")
-    real_url = resolve_with_playwright(ino_url)
+    print("fetching article")
+    real_url = row.get("url")
+    #real_url = resolve_with_playwright(ino_url)
     # Fallback to provided URL if summary doesn't help
     if not real_url:
         real_url = row.get("url", "")
@@ -61,10 +80,8 @@ def fetch_full_article_text(row):
     print(f"Extracted final URL: {real_url}")
     try:
         article = Article(real_url)
-        print(article)
         article.download()
         article.parse()
-        print(article.text)
         return article.text
     except Exception as e:
         print(f"Error fetching article from {real_url}: {e}")

@@ -28,12 +28,13 @@ from interface import (
     build_interface,
     display_output,
     get_user_inputs,
-    load_header
+    load_header,
+    # display_onedrive_auth
 )
 from tabs.about import about_tab
 from tabs.faq import faq_tab
-from services.query_gpt import new_openai_session, query_gpt_for_relevance, query_gpt_for_relevance_iterative
-from site_text.questions import STEEL_YES, STEEL_NO, IRON_YES, IRON_NO
+from services.query_gpt import new_openai_session, query_gpt_for_relevance, query_gpt_for_relevance_iterative, query_gpt_for_project_details
+from site_text.questions import STEEL_YES, STEEL_NO, IRON_YES, IRON_NO, STEEL_TECH, IRON_TECH
 from utils.read_pdf import extract_text_chunks_from_pdf
 from utils.read_docx import extract_text_chunks_from_docx
 from utils.read_json import parse_json_feed
@@ -42,8 +43,8 @@ from utils.relevant_excerpts import (
     find_top_relevant_texts
 )
 from utils.results import format_output_doc, get_output_fname, output_results, output_results_excel  
-
-
+from services.onedrive import get_onedrive_access_token, upload_file_to_onedrive
+from services.inoreader import resolve_with_playwright
 from docx import Document
 from tempfile import TemporaryDirectory
 import json
@@ -260,15 +261,31 @@ def main(gpt_analyzer, openai_apikey):
     for _, row in relevance_df.iterrows():
         article_index = row["index"]
         article_row = headlines.loc[article_index]
-        title = article_row["title"]
+        article_row["title"] = article_row["title"].split(" - ")[0].strip()
+        title = article_row["title"] 
+        article_row["url"] = resolve_with_playwright(article_row["url"])
         url = article_row["url"]
-
-        # full_text = fetch_full_article_text(article_row)
         if row["relevant"] != "no":
-            relevant_articles.append({
-                "title": title,
-                "url": url
-            })
+            # Fetch full article text (or use text from the article if already available)
+            full_text = fetch_full_article_text(article_row)
+            # Extract project details from the article text using the new GPT function.
+            details = query_gpt_for_project_details(openai_client, gpt_model, full_text, IRON_TECH)
+            print("done w/ details")
+            if details:
+                # Merge the details into the article dictionary.
+                article_info = {
+                    "title": title,
+                    "url": url,
+                    "full_text": full_text,
+                    **details
+                }
+                relevant_articles.append(article_info)
+            else:
+                article_info = {
+                    "title": title,
+                    "url": url
+                }
+                relevant_articles.append(article_info)
         else:
             irrelevant_articles.append({
                 "title": title,
@@ -287,11 +304,31 @@ def main(gpt_analyzer, openai_apikey):
 
     # Optionally, display or notify the user that the file has been created
     display_output(output_fname)
+
+    # At the bottom of your main() function (after display_output)
+    if "onedrive_clicked" not in st.session_state:
+        st.session_state.onedrive_clicked = False
+
+    # Create a container for output messages.
+    onedrive_output = st.empty()
+
+    if st.button("Send Results to OneDrive"):
+        st.session_state.onedrive_clicked = True
+
+    if st.session_state.onedrive_clicked:
+        onedrive_output.write("Trying to get access token...")
+        access_token = get_onedrive_access_token()
+        onedrive_output.write("Access token:", access_token)
+        if access_token:
+            # Hardcode the OneDrive file name or allow the user to specify one.
+            onedrive_filename = "results.xlsx"
+            result = upload_file_to_onedrive(access_token, output_fname, onedrive_filename)
+            if result:
+                onedrive_output.success("Results successfully sent to OneDrive!")
+            else:
+                onedrive_output.error("OneDrive upload failed.")
+
     print_milestone("Done processing headlines", total_start_time, {"Number of articles": len(relevant_articles)})
-    
-    output_fname = get_output_fname(get_resource_path)
-    display_output(output_fname)
-    
     return len(relevant_articles)
 
 
@@ -303,6 +340,7 @@ if __name__ == "__main__":
         st.session_state["oauth_state"] = query_params["state"]
     elif "oauth_state" not in st.session_state:
         st.session_state["oauth_state"] = secrets.token_urlsafe(16)
+    
     try:
         with TemporaryDirectory() as temp_dir:
             logo_path = os.path.join(os.path.dirname(__file__), "public", "logo2.jpg")
@@ -310,6 +348,8 @@ if __name__ == "__main__":
                 layout="wide", page_title="AI Headline Processor", page_icon=logo_path
             )
             load_header()
+            # display_onedrive_auth()
+            
             _, centered_div, _ = st.columns([1, 3, 1])
             with centered_div:
                 tab1, tab2, tab3 = st.tabs(["Tool", "About", "FAQ"])
