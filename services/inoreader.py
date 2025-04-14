@@ -30,7 +30,7 @@ def fetch_inoreader_articles(folder_name):
     one_week_ago = int(time.time()) - 7 * 24 * 60 * 60
     
     articles = []
-    n = 5
+    n = 100
     continuation = None
     
     # Build the stream URL.
@@ -39,30 +39,30 @@ def fetch_inoreader_articles(folder_name):
     headers = {"Authorization": f"Bearer {access_token}"}
     
     # Loop until no continuation token is returned.
-    #while True:
+    while True:
         # Set parameters: using r="o" (oldest first) and ot with the start time.
-    params = {
-        "n": n,
-        "r": "o",
-        "ot": one_week_ago,
-        "output": "json"  # explicitly request JSON, though this endpoint returns JSON by default.
-    }
-    if continuation:
-        params["c"] = continuation
-    
-    response = requests.get(base_url, headers=headers, params=params)
-    if response.status_code == 200:
-        json_data = response.json()
-        items = json_data.get("items", [])
-        # if not items:
-        #     break
-        articles.extend(items)
+        params = {
+            "n": n,
+            "r": "o",
+            "ot": one_week_ago,
+            "output": "json"  # explicitly request JSON, though this endpoint returns JSON by default.
+        }
+        if continuation:
+            params["c"] = continuation
         
-        continuation = json_data.get("continuation")
-        # if not continuation:
-        #     break
-    # else:
-    #     break
+        response = requests.get(base_url, headers=headers, params=params)
+        if response.status_code == 200:
+            json_data = response.json()
+            items = json_data.get("items", [])
+            if not items:
+                break
+            articles.extend(items)
+            
+            continuation = json_data.get("continuation")
+            if not continuation:
+                break
+        else:
+            break
             
     return articles
 
