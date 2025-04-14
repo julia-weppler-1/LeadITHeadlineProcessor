@@ -43,11 +43,8 @@ from services.inoreader import build_df_for_folder, fetch_full_article_text
 from utils.relevant_excerpts import (
     find_top_relevant_texts
 )
-from services.onedrive import upload_file_to_onedrive
-from utils.results import get_output_fname, output_results, output_results_excel  
-#from services.onedrive import get_onedrive_access_token, upload_file_to_onedrive
+from utils.results import get_output_fname, output_results_excel  
 from services.inoreader import resolve_with_playwright
-from docx import Document
 from tempfile import TemporaryDirectory
 import json
 import os
@@ -56,7 +53,9 @@ import streamlit as st
 import time
 import traceback
 import secrets
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 def get_resource_path(relative_path):
     """
     Returns the resource path for a given relative path.
@@ -298,12 +297,12 @@ def main(gpt_analyzer, openai_apikey):
                 "url": url
             })
 
-    print(f"Total relevant articles: {len(relevant_articles)}")
-    print(f"Total irrelevant articles: {len(irrelevant_articles)}")
+    logger.info("Total relevant articles: %s", len(relevant_articles))
+    logger.info("Total irrelevant articles: %s", len(irrelevant_articles))
 
     # Define output file name and path
     output_fname = get_output_fname(get_resource_path, filetype="xlsx")
-    print(f"Saving Excel file to {output_fname}")
+    logger.info("Saving Excel file to %s", output_fname)
 
     # Use the new Excel output function
     output_results_excel(relevant_articles, irrelevant_articles, output_fname)

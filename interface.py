@@ -222,6 +222,7 @@ def get_user_inputs():
 
 
 def display_output(xlsx_fname):
+    logger.info("Here")
     with open(xlsx_fname, "rb") as f:
         binary_file = f.read()
         st.download_button(

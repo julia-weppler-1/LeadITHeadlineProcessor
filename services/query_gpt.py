@@ -4,6 +4,9 @@ import pandas as pd
 import string
 import json
 from site_text.questions import PROJECT_STATUS
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 def new_openai_session(openai_apikey):
     os.environ["OPENAI_API_KEY"] = openai_apikey
     client = OpenAI()
@@ -49,8 +52,8 @@ def fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text
 def query_gpt_for_relevance(
     gpt_analyzer, df, variable_specs, run_on_full_text, gpt_client, gpt_model
 ):
-    print("Variable specs", variable_specs)
-    print("Querying each element in the dataframe...")
+
+    logger.info("Querying each element in the dataframe...")
 
     results = []
     for index, row in df.iterrows():
@@ -62,7 +65,7 @@ def query_gpt_for_relevance(
             query = f'Please respond with only "yes" or "no". Is this relevant to "{var_name}", given "{var_desc}"?\n\nContent:\n"""{row["text_column"]}"""'
             resp_fmt = gpt_analyzer.resp_format_type()
             response = fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text)
-            
+            logger.info("Response: %s", response)
             # Ensure response is stripped and standardized
             response_cleaned = response.strip().lower().translate(str.maketrans('', '', string.punctuation))
             if response_cleaned not in ["yes", "no"]:
