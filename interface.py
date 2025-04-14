@@ -231,7 +231,7 @@ def display_output(xlsx_fname):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     # Add a button to send results to OneDrive.
-    if st.button("Send Results to OneDrive"):
-        send_results_to_drive(xlsx_fname)
+    # if st.button("Send Results to OneDrive"):
+    #     send_results_to_drive(xlsx_fname)
 
 
