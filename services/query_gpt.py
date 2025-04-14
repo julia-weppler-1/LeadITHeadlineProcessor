@@ -130,7 +130,7 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
       - country: the country where the project is located
       - project_status: the current status of the project, one of: <PROJECT_STATUS>
       
-      Additionally, if the article text is not related to iron production at all, return empty values for these fields and include a key "irrelevant" with value true.
+      Additionally, if the article text is not related to cement production at all, return empty values for these fields and include a key "irrelevant" with value true.
     
     Returns a dictionary with all keys. Missing details are returned as empty strings.
     """
@@ -186,7 +186,7 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
             "- continent: the continent where the project is located\n"
             "- country: the country where the project is located\n"
             f"- project_status: the current status of the project, one of the following: {', '.join(PROJECT_STATUS)}\n\n"
-            "IMPORTANT: If the article text is not related to iron production at all or it is about a FINISHED product, return empty values for all these fields "
+            "IMPORTANT: If the article text is not related to cement production at all or it is about a FINISHED product, return empty values for all these fields "
             "and include a key \"irrelevant\" with value true.\n\n"
             "Return your answer as a JSON object with keys exactly: 'company', 'projects mentioned', 'partners', 'continent', 'country', 'project_status', and optionally 'irrelevant'. "
             "If a detail is not available, leave its value as an empty string.\n\n"

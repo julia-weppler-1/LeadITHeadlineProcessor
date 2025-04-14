@@ -42,7 +42,6 @@ def exchange_code_for_token(auth_code):
     if response.status_code == 200:
         return response.json()
     else:
-        st.error(f"Error exchanging code for token: {response.text}")
         return None
 
 def fetch_inoreader_data():

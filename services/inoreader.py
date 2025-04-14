@@ -10,29 +10,56 @@ from playwright.sync_api import sync_playwright
 
 
 def fetch_inoreader_articles(folder_name):
-    if "access_token" not in st.session_state:
-        st.error("You need to log in to Inoreader first.")
+    """
+    Fetch all articles from a given folder (label) that were published in the past week.
+    This function uses pagination (via the continuation token) and query parameters:
+      - n: max number of items per request (100)
+      - r: order ("o" for oldest first so that we can use the ot parameter)
+      - ot: start time (Unix timestamp) from which to return items
+    """
+    access_token = st.session_state["access_token"]
+    if not access_token:
         return []
-
-    headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
     
-    # Calculate the Unix timestamp for one week ago
+    # Compute the Unix timestamp for one week ago.
     one_week_ago = int(time.time()) - 7 * 24 * 60 * 60
     
-    # Build the stream ID by URL-encoding the folder (label) name
+    articles = []
+    n = 100
+    continuation = None
+    
+    # Build the stream URL.
     stream_id = urllib.parse.quote(f"user/-/label/{folder_name}", safe='')
-    url = f"https://www.inoreader.com/reader/api/0/stream/contents/{stream_id}"
+    base_url = f"https://www.inoreader.com/reader/api/0/stream/contents/{stream_id}"
+    headers = {"Authorization": f"Bearer {access_token}"}
     
-    # Set parameters to filter for items published since one week ago
-    params = {"n": 1}
-    
-    response = requests.get(url, headers=headers, params=params)
-
-    if response.status_code == 200:
-        return response.json().get("items", [])
-    else:
-        st.error(f"Failed to fetch Inoreader articles: {response.text}")
-        return []
+    # Loop until no continuation token is returned.
+    while True:
+        # Set parameters: using r="o" (oldest first) and ot with the start time.
+        params = {
+            "n": n,
+            "r": "o",
+            "ot": one_week_ago,
+            "output": "json"  # explicitly request JSON, though this endpoint returns JSON by default.
+        }
+        if continuation:
+            params["c"] = continuation
+        
+        response = requests.get(base_url, headers=headers, params=params)
+        if response.status_code == 200:
+            json_data = response.json()
+            items = json_data.get("items", [])
+            if not items:
+                break
+            articles.extend(items)
+            
+            continuation = json_data.get("continuation")
+            if not continuation:
+                break
+        else:
+            break
+            
+    return articles
 
 
 def build_df_for_folder(folder_name):

@@ -5,13 +5,50 @@ import json
 import os
 import pandas as pd
 import streamlit as st
-import zipfile
+from services.onedrive import send_results_to_drive
 from services import oauth
 import logging
 from services import inoreader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-# from services.onedrive import exchange_code_for_token, get_authorization_url
+from services.onedrive import get_authorization_url
+
+def display_onedrive_login():
+    """
+    If the OneDrive token is missing, show a dedicated login page.
+    This page includes a clear sign-in link (retrieved from Microsoft) that the user must click,
+    and instructions telling them to sign in.
+    """
+    import streamlit as st
+    from services.onedrive import get_authorization_url, exchange_code_for_token
+
+    st.title("OneDrive Login Required")
+    st.write("To continue, you must sign in to Microsoft and authorize the app to access your OneDrive.")
+
+    # Check query parameters to see if we have a code (i.e. user returned from Microsoft)
+    query_params = st.query_params
+    print("hi")
+    if "code" in query_params:
+        auth_code = query_params["code"][0]
+        st.write("Processing authorization code...")
+        token_response = exchange_code_for_token(auth_code)
+        st.write("Token response:", token_response)  # Debug: inspect the token response
+        if token_response and "access_token" in token_response:
+            st.session_state["onedrive_token"] = token_response["access_token"]
+            st.success("OneDrive authorization complete!")
+            st.experimental_set_query_params()  # Clear query parameters
+        else:
+            st.error("Error obtaining OneDrive token. Please try again.")
+            st.stop()
+    
+    # If there’s still no token, show the sign‑in link.
+    if "onedrive_token" not in st.session_state or not st.session_state["onedrive_token"]:
+        print("here")
+        auth_url = get_authorization_url()
+        st.markdown(f'[Sign in with Microsoft]({auth_url})', unsafe_allow_html=True)
+        st.write("After signing in, come back to this page.")
+        st.stop()  # Stop further processing until authentication is complete.
+
 
 
 def load_header():
@@ -32,111 +69,22 @@ Users can define specific queries to extract targeted information from any colle
 def load_text():
     instructions = """
 ## How to use
+
+Start by connecting the application to your Inoreader account. Once it has successfully connected, choose the folder you'd like to connect to. As soon as one is chosen and the articles are fetched, click "Run". It make take up to an hour to process all of the articles in your given folder for the past week. Please be patient. When the results are done, you can click the option to download your results. Please DO NOT refresh while your results are being loaded.
 """
 
     st.markdown(instructions)
-    st.markdown("""## Submit your processing request""")
-# def display_onedrive_auth():
-
-#     st.sidebar.header("Microsoft OneDrive Authorization")
-    
-#     # Process query parameters to see if Microsoft redirected back with a code.
-#     query_params = st.experimental_get_query_params()
-#     if "code" in query_params:
-#         auth_code = query_params["code"][0]
-#         token_response = exchange_code_for_token(auth_code)
-#         if token_response and "access_token" in token_response:
-#             st.session_state["onedrive_token"] = token_response["access_token"]
-#             st.sidebar.success("OneDrive Authorized!")
-#         else:
-#             st.sidebar.error("Failed to obtain OneDrive token.")
-#     else:
-#         if "onedrive_token" not in st.session_state or not st.session_state["onedrive_token"]:
-#             st.sidebar.write("Click below to authorize OneDrive.")
-#             if st.sidebar.button("Authorize OneDrive"):
-#                 auth_url = get_authorization_url()
-#                 st.sidebar.markdown(f"[Sign in with Microsoft]({auth_url})", unsafe_allow_html=True)
-#         else:
-#             st.sidebar.success("OneDrive already authorized.")
 
 
 
 def upload_file(temp_dir):
-    st.subheader("I. Choose Your Input Method")
     # Track active tab in session state
     query_params = st.query_params 
-    if "state" in query_params:
-        default_tab = "Connect to Inoreader"
-    else:
-        default_tab = "JSON File"
-
-    if "active_tab" not in st.session_state:
-        st.session_state["active_tab"] = default_tab
-
-    active_tab_radio = st.radio(
-        "Select analysis type:", 
-        ["JSON File", "Connect to Inoreader"],
-        index=["JSON File", "Connect to Inoreader"].index(st.session_state["active_tab"]),
-        key="active_tab_radio",
-        horizontal=True,
-        help="""Select **JSON File** if using tool for the first time on a selection of downloaded news articles from an RSS app. 
-        **Connect to Inoreader** may be run on an existing Inoreader stream."""
-    )
-
-    # Detect if the tab has changed
-    if active_tab_radio != st.session_state["active_tab"]:
-        # Clear any previous uploads when switching tabs
-        st.session_state["json"] = []
-        st.session_state["selected_json"] = []
-        st.session_state["temp_zip_path"] = None
-        st.session_state["run_disabled"] = True  # Prevent running with no files
-
-    # Update the active_tab value in session state
-    st.session_state["active_tab"] = active_tab_radio
-    active_tab = active_tab_radio
-
-    if active_tab != st.session_state["active_tab"]:
-        # Clear any previous uploads when switching tabs
-        st.session_state["json"] = []
-        st.session_state["selected_json"] = []
-        st.session_state["temp_zip_path"] = None
-        st.session_state["run_disabled"] = True  
-
-    st.session_state["active_tab"] = active_tab 
+    st.session_state["active_tab"] = "Connect to Inoreader"
 
     json = []  
-    if active_tab == "JSON File":
-        uploaded_file = st.file_uploader(
-            "Upload a **single JSON** file exported from your Inoreader feed (download folder as JSON)",
-            type=["JSON"],
-        )
-
-        st.markdown(
-            "*Please note: uploaded information will be processed by OpenAI and may be used to train further models. "
-        )
-        if uploaded_file is not None:
-            file_name = uploaded_file.name
-
-            if file_name.endswith(".json"):
-                # Save the single uploaded JSON to a temporary location
-                file_path = os.path.join(temp_dir, file_name)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getvalue())
-                json.append(file_path)
-
-        if json:
-            st.session_state["json"] = json
-            st.success(f"Uploaded {len(json)} document(s) successfully!", icon="✅")
-
-            if len(json) == 1:
-                # Disable the subset checkbox if only one PDF is uploaded
-                st.session_state["max_files"] = None
-                st.session_state["file_select_label"] = "No need to select subset for analysis."
-            st.session_state["selected_json"] = [json[0]]
-            st.session_state["run_disabled"] = False  # Enable Run if only one PDF
-        else:
-            st.warning("Please upload a single JSON file.", icon="⚠️")
-    elif active_tab == "Connect to Inoreader":
+    
+    if st.session_state["active_tab"] == "Connect to Inoreader":
         st.subheader("Authorize Inoreader Access")
         query_params = st.query_params 
         stored_state = st.session_state.get("oauth_state")
@@ -147,9 +95,7 @@ def upload_file(temp_dir):
         
         if "code" in query_params and "state" in query_params:
             returned_state = query_params["state"]
-            if returned_state != stored_state:
-                st.error("State parameter mismatch. Potential CSRF attack detected.")
-            else:
+            if returned_state == stored_state:
                 auth_code = query_params["code"]
                 token = oauth.exchange_code_for_token(auth_code)
                 if token:
@@ -158,40 +104,28 @@ def upload_file(temp_dir):
                     st.success("Successfully authenticated with Inoreader!")
                     
                     # Use a text input with its own key so its value is stored in a separate widget key.
-                    folder_input = st.text_input(
-                        "Target Folder", 
-                        value=st.session_state["target_folder"], 
-                        key="target_folder_input", 
-                        help="Enter the target folder name from Inoreader (e.g., LeadIT-Iron)"
-                    )
                     
-                    # Use a button to trigger article fetching.
-                    if st.button("Fetch Articles", key="fetch_articles_button"):
-                        if folder_input.strip():
-                            # Update the target folder in session state.
-                            st.session_state["target_folder"] = folder_input.strip()
-                            articles = inoreader.fetch_inoreader_articles(folder_input.strip())
-                            st.session_state["json"] = articles
-                            st.session_state["selected_json"] = articles
-                            st.session_state["run_disabled"] = False
-                            st.session_state["inoreader_authenticated"] = True
-                            st.success(f"Fetched {len(articles)} articles from folder '{folder_input.strip()}'.")
-                            # Optionally, you may delay or remove the experimental rerun while debugging:
-                            st.experimental_rerun()
-                        else:
-                            st.error("Please enter a valid target folder.")
-                else:
-                    st.error("Failed to exchange token.")
         else:
+            st.session_state["run_disabled"] = True
             auth_url = oauth.get_authorization_url()
             st.markdown(f'<a href="{auth_url}">Authorize with Inoreader</a>', unsafe_allow_html=True)
-
-
-
-
-
-
-
+            st.stop()
+    folder_choice = st.selectbox(
+        "Select Target Folder", 
+        options=["LeadIT-Iron", "LeadIT-Steel", "LeadIT-Cement"],
+        key="target_folder_input"
+    )
+    
+    # Display a "Fetch Articles" button.
+    if st.button("Fetch Articles", key="fetch_articles_button"):
+        st.session_state["target_folder"] = folder_choice
+        # Fetch articles using the chosen folder.
+        articles = inoreader.fetch_inoreader_articles(folder_choice)
+        st.session_state["json"] = articles
+        st.session_state["selected_json"] = articles
+        st.session_state["run_disabled"] = False
+        st.session_state["inoreader_authenticated"] = True
+        st.success(f"Fetched {len(articles)} articles from folder '{folder_choice}'.")
 
 
 
@@ -204,26 +138,7 @@ def upload_file(temp_dir):
 
 
 def input_main_query():
-    st.markdown("")
-    st.subheader("II. Edit Main Query Template")
-    # qtemplate_instructions = (
-    #     "Modify the generalized template query below. Please note curly brackets indicate "
-    #     "keywords. *{variable_name}*, *{variable_description}*, and *{context}* will be replaced by each "
-    #     "of variable specification listed in the table below (i.e. [SDG1: End poverty in all "
-    #     "its forms everywhere, SDG2: End hunger, achieve food security..])."
-    # )
-    # qtemplate = (
-    #     "Extract any quote that addresses “{variable_name}” which we define as “{variable_description}”. "
-    #     "Only include direct quotations with the corresponding page number(s)."
-    # )
-    # st.session_state["main_query_input"] = st.text_area(
-    #     qtemplate_instructions, value=qtemplate, height=150
-    # )
-    qtemplate_tips = (
-        "This option is disabled during development"
-    )
     st.session_state["main_query_input"] = "Extract any quote that addresses “{variable_name}” which we define as “{variable_description}”. "
-    st.markdown(qtemplate_tips)
 
 
 def var_json_to_df(json_fname):
@@ -232,36 +147,12 @@ def var_json_to_df(json_fname):
         sdg_var_specs = json.load(file)
         return pd.DataFrame(sdg_var_specs)
 
-def clear_variables():
-    empty_df = pd.DataFrame(
-        [{"variable_name": None, "variable_description": None, "context": None}]
-    )
-    st.session_state["variables_df"] = empty_df
-
 
 def input_data_specs():
-    st.markdown("")
-    st.subheader("III. Specify Variables to Extract from Headlines")
-
-    st.markdown(
-        "**Type-in variable details or copy-and-paste from an excel spreadsheet (3 columns, no headers).**"
-    )
     if "variables_df" not in st.session_state:
         st.session_state["variables_df"] = var_json_to_df("default_var_specs.json")
-    variable_specification_parameters = [
-        "variable_name",
-        "variable_description",
-        "context",
-    ]
-    variables_df = st.session_state["variables_df"]
-    st.session_state["schema_table"] = st.data_editor(
-        variables_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        column_order=variable_specification_parameters,
-    )
-    st.button("Clear", on_click=clear_variables)
+    # Instead of displaying an editable table, just store the DataFrame in session state.
+    st.session_state["schema_table"] = st.session_state["variables_df"]
     
 
 
@@ -282,39 +173,6 @@ def process_table():
         for _, row in df.iterrows()
     }
 
-
-
-
-
-# def build_interface(tmp_dir):
-#     if "task_type" not in st.session_state:
-#         st.session_state["task_type"] = "Headline extraction"
-#     if "is_test_run" not in st.session_state:
-#         st.session_state["is_test_run"] = True
-#     load_text()
-#     upload_file(tmp_dir)
-#     input_main_query()
-#     if "output_format_options" not in st.session_state:
-#         st.session_state["output_format_options"] = {
-#             "Sort by quotes; each quote will be one row": "quotes_sorted",
-#             "Simply return GPT responses for each variable": "quotes_gpt_resp",
-#             "Sort by quotes labelled with variable_name and subcategories": "quotes_sorted_and_labelled",
-#             "Return list of quotes per variable": "quotes_structured",
-#         }
-#     if "json" not in st.session_state:
-#         st.session_state["json"] = "no_upload"
-#     if "schema_input_format" not in st.session_state:
-#         st.session_state["schema_input_format"] = "Manual Entry"
-#     if "output_format" not in st.session_state:
-#         st.session_state["output_format"] = list(
-#             st.session_state["output_format_options"].keys()
-#         )[1]
-#     if "custom_output_fmt" not in st.session_state:
-#         st.session_state["custom_output_fmt"] = None
-#     if "output_detail_df" not in st.session_state:
-#         st.session_state["output_detail_df"] = None
-#     input_data_specs()
-#     st.divider()
 def build_interface(tmp_dir):
     if "task_type" not in st.session_state:
         st.session_state["task_type"] = "Headline extraction"
@@ -345,13 +203,9 @@ def build_interface(tmp_dir):
         st.session_state["output_detail_df"] = None
     # Unconditionally call input_data_specs to populate section III.
     input_data_specs()
-    st.divider()
 
 def get_user_inputs():
     json = st.session_state["json"]
-
-    # if st.session_state["is_test_run"]:
-    #     json = st.session_state["selected_json"]
     main_query = st.session_state["main_query_input"]
     variable_specs = process_table()
     task_type = st.session_state["task_type"]
@@ -376,5 +230,8 @@ def display_output(xlsx_fname):
             file_name="results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+    # Add a button to send results to OneDrive.
+    if st.button("Send Results to OneDrive"):
+        send_results_to_drive(xlsx_fname)
 
 

@@ -15,3 +15,4 @@ lxml==4.9.3
 newspaper3k
 openpyxl
 playwright==1.43.0
+rapidfuzz 

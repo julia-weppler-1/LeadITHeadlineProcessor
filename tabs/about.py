@@ -14,7 +14,7 @@ The GPT-Batch Headline Processor (beta) tool is made available for public use wi
 **Date of release**: .
 
 ### Tool Attribution
-The tool was created by the following contributors:
+The tool was created by the following contributors: Miquel Muñoz Cabré, Julia Weppler, Eileen Torres Morales, William Babis
 
 
 ### Licensing and Copyright Information

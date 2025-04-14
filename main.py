@@ -29,12 +29,13 @@ from interface import (
     display_output,
     get_user_inputs,
     load_header,
+    display_onedrive_login
     # display_onedrive_auth
 )
 from tabs.about import about_tab
 from tabs.faq import faq_tab
 from services.query_gpt import new_openai_session, query_gpt_for_relevance, query_gpt_for_relevance_iterative, query_gpt_for_project_details
-from site_text.questions import STEEL_YES, STEEL_NO, IRON_YES, IRON_NO, STEEL_TECH, IRON_TECH
+from site_text.questions import STEEL_NO, IRON_NO, STEEL_IRON_TECH, CEMENT_NO, CEMENT_TECH
 from utils.read_pdf import extract_text_chunks_from_pdf
 from utils.read_docx import extract_text_chunks_from_docx
 from utils.read_json import parse_json_feed
@@ -42,8 +43,9 @@ from services.inoreader import build_df_for_folder, fetch_full_article_text
 from utils.relevant_excerpts import (
     find_top_relevant_texts
 )
-from utils.results import format_output_doc, get_output_fname, output_results, output_results_excel  
-from services.onedrive import get_onedrive_access_token, upload_file_to_onedrive
+from services.onedrive import upload_file_to_onedrive
+from utils.results import get_output_fname, output_results, output_results_excel  
+#from services.onedrive import get_onedrive_access_token, upload_file_to_onedrive
 from services.inoreader import resolve_with_playwright
 from docx import Document
 from tempfile import TemporaryDirectory
@@ -78,7 +80,6 @@ def extract_text_chunks(file_path, max_chunk_size):
         return extract_text_chunks_from_docx(file_path, max_chunk_size)
     else:
         return [{"error": f"Unsupported file format: {file_path}"}]
-# USE THIS LATER FOR NEWS ARTICLE INFO?
 def extract_news_doc_info(
     gpt_analyzer,
     text_embeddings,
@@ -224,7 +225,7 @@ def main(gpt_analyzer, openai_apikey):
             return 0
     else:
         try:
-            headlines = build_df_for_folder("LeadIT-Iron")
+            headlines = build_df_for_folder(st.session_state["target_folder"])
             json_path = "Inoreader"
             print(headlines)
             print(f"Parsed {len(headlines)} headlines from JSON.")
@@ -235,12 +236,14 @@ def main(gpt_analyzer, openai_apikey):
     
     # Convert headlines into a DataFrame with necessary text column
     headlines["text_column"] = headlines["title"] + " " + headlines.get("summary", "")
-    folder = "LeadIT-Iron"
+    folder = st.session_state["target_folder"]
     print("Folder", folder)
     if folder == "LeadIT-Steel":
         target_questions = STEEL_NO
     elif folder == "LeadIT-Iron":
         target_questions = IRON_NO
+    elif folder == "LeadIT-Cement":
+        target_questions = CEMENT_NO
     else:
         target_questions = []  # or some default
     print("Target q's", target_questions)
@@ -268,8 +271,11 @@ def main(gpt_analyzer, openai_apikey):
         if row["relevant"] != "no":
             # Fetch full article text (or use text from the article if already available)
             full_text = fetch_full_article_text(article_row)
+            if st.session_state["target_folder"] == "LeadIT-Cement":
             # Extract project details from the article text using the new GPT function.
-            details = query_gpt_for_project_details(openai_client, gpt_model, full_text, IRON_TECH)
+                details = query_gpt_for_project_details(openai_client, gpt_model, full_text, CEMENT_TECH)
+            else:
+                details = query_gpt_for_project_details(openai_client, gpt_model, full_text, STEEL_IRON_TECH)  
             print("done w/ details")
             if details:
                 # Merge the details into the article dictionary.
@@ -305,28 +311,20 @@ def main(gpt_analyzer, openai_apikey):
     # Optionally, display or notify the user that the file has been created
     display_output(output_fname)
 
-    # At the bottom of your main() function (after display_output)
-    if "onedrive_clicked" not in st.session_state:
-        st.session_state.onedrive_clicked = False
+    # access_token = st.session_state.get("onedrive_token")
+    # if access_token:
+    #     onedrive_filename = "results.xlsx"
+    #     result = upload_file_to_onedrive(access_token, output_fname, onedrive_filename)
+    #     if result:
+    #         st.success("Results successfully sent to OneDrive!")
+    #     else:
+    #         st.error("OneDrive upload failed.")
 
     # Create a container for output messages.
-    onedrive_output = st.empty()
 
-    if st.button("Send Results to OneDrive"):
-        st.session_state.onedrive_clicked = True
+    
 
-    if st.session_state.onedrive_clicked:
-        onedrive_output.write("Trying to get access token...")
-        access_token = get_onedrive_access_token()
-        onedrive_output.write("Access token:", access_token)
-        if access_token:
-            # Hardcode the OneDrive file name or allow the user to specify one.
-            onedrive_filename = "results.xlsx"
-            result = upload_file_to_onedrive(access_token, output_fname, onedrive_filename)
-            if result:
-                onedrive_output.success("Results successfully sent to OneDrive!")
-            else:
-                onedrive_output.error("OneDrive upload failed.")
+    
 
     print_milestone("Done processing headlines", total_start_time, {"Number of articles": len(relevant_articles)})
     return len(relevant_articles)
@@ -347,8 +345,9 @@ if __name__ == "__main__":
             st.set_page_config(
                 layout="wide", page_title="AI Headline Processor", page_icon=logo_path
             )
+            # if "onedrive_token" not in st.session_state or not st.session_state["onedrive_token"]:
+            #     display_onedrive_login()
             load_header()
-            # display_onedrive_auth()
             
             _, centered_div, _ = st.columns([1, 3, 1])
             with centered_div:
