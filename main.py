@@ -179,29 +179,6 @@ def fetch_gist_content(gist_url, headers, log_fname):
         print("Failed to fetch gist content.")
         return None
 
-
-def log(new_content):
-    """
-    Logs new activity to a GitHub gist.
-
-    Args:
-        new_content: The new content to log.
-    """
-    github_token = st.secrets["github_token"]
-    log_fname = "log"
-    gist_base_url = "https://api.github.com/gists"
-    gist_url = f"{gist_base_url}/47029f286297a129a654110ebe420f5f"
-    headers = {
-        "Authorization": f"token {github_token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    current_content = fetch_gist_content(gist_url, headers, log_fname)
-    if current_content is not None:
-        updated_content = f"{current_content} \n {new_content}"
-        data = {"files": {log_fname: {"content": updated_content}}}
-        requests.patch(gist_url, headers=headers, data=json.dumps(data))
-
-
 def main(gpt_analyzer, openai_apikey):
     """
     Main function to process headlines and generate an output document.
@@ -351,9 +328,6 @@ if __name__ == "__main__":
                                 apikey_id = st.session_state["apikey_id"]
                             openai_apikey = st.secrets[apikey_id]
                             num_pages = main(gpt_analyzer, openai_apikey)
-                            log(
-                                f"{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())} GMT --> apikey_id; {num_pages} pages; {gpt_analyzer}"
-                            )
                         st.success("Document generated!")
                         os.unlink(st.session_state["temp_zip_path"])
                 with tab2:
@@ -361,7 +335,4 @@ if __name__ == "__main__":
                 with tab3:
                     faq_tab()
     except Exception as e:
-        log(
-            f"{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())} GMT --> apikey_id:{e}"
-        )
-        log(traceback.format_exc())
+        st.error("Something unexpected occurred")

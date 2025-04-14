@@ -5,13 +5,11 @@ import json
 import os
 import pandas as pd
 import streamlit as st
-from services.onedrive import send_results_to_drive
 from services import oauth
 import logging
 from services import inoreader
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-from services.onedrive import get_authorization_url
 
 def display_onedrive_login():
     """
@@ -222,7 +220,6 @@ def get_user_inputs():
 
 
 def display_output(xlsx_fname):
-    logger.info("Here")
     with open(xlsx_fname, "rb") as f:
         binary_file = f.read()
         st.download_button(
@@ -231,8 +228,4 @@ def display_output(xlsx_fname):
             file_name="results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-    # Add a button to send results to OneDrive.
-    # if st.button("Send Results to OneDrive"):
-    #     send_results_to_drive(xlsx_fname)
-
 
