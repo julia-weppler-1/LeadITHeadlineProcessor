@@ -25,7 +25,7 @@ def fetch_inoreader_articles(folder_name):
     one_week_ago = int(time.time()) - 7 * 24 * 60 * 60
     
     articles = []
-    n = 100
+    n = 5
     continuation = None
     
     # Build the stream URL.
