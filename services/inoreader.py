@@ -10,7 +10,6 @@ from playwright.async_api import async_playwright
 import logging
 import asyncio
 import os
-os.system("playwright install")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
