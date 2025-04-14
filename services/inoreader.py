@@ -10,7 +10,7 @@ from playwright.async_api import async_playwright
 import logging
 import asyncio
 import os
-
+import subprocess
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,27 @@ def build_df_for_folder(folder_name):
     df = parse_inoreader_feed(response)
     return(df)
 
+async def ensure_playwright_browsers():
+    # Define the expected path to the Chromium executable.
+    chrome_path = os.path.expanduser("~/.cache/ms-playwright/chromium-1112/chrome-linux/chrome")
+    if not os.path.exists(chrome_path):
+        logger.info("Chromium executable not found at %s. Installing...", chrome_path)
+        try:
+            await asyncio.to_thread(
+                subprocess.run,
+                ["playwright", "install", "chromium"],
+                check=True
+            )
+            logger.info("Browser installation completed.")
+        except Exception as e:
+            logger.error("Error installing browsers via playwright install: %s", e)
+            raise
+
 async def resolve_with_playwright_async(url):
     logger.info("Starting resolve_with_playwright_async for URL: %s", url)
+    # Ensure the required browsers are installed before launching.
+    await ensure_playwright_browsers()
+    
     async with async_playwright() as p:
         logger.info("Creating browser")
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
@@ -85,8 +104,8 @@ async def resolve_with_playwright_async(url):
                 await route.abort()
             else:
                 await route.continue_()
-
         await page.route("**/*", block_resource)
+
         try:
             logger.info("Navigating to URL: %s", url)
             await page.goto(url, wait_until="networkidle", timeout=15000)
@@ -100,8 +119,8 @@ async def resolve_with_playwright_async(url):
 
 def resolve_with_playwright(url):
     """
-    Synchronously run the asynchronous resolve_with_playwright_async function.
-    Uses WindowsProactorEventLoopPolicy() for Windows if needed.
+    Synchronously run the async resolve_with_playwright_async function.
+    Uses WindowsProactorEventLoopPolicy on Windows if needed.
     """
     try:
         if os.name == 'nt':

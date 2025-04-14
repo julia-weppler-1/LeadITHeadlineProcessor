@@ -1,2 +1,2 @@
-[build]
-  command = "./setup.sh"
+[server]
+maxUploadSize = 2000
