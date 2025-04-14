@@ -7,7 +7,9 @@ from newspaper import Article
 import re
 import urllib.parse
 from playwright.async_api import async_playwright
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def fetch_inoreader_articles(folder_name):
     """
@@ -67,35 +69,45 @@ def build_df_for_folder(folder_name):
     df = parse_inoreader_feed(response)
     return(df)
 
-async def resolve_with_playwright(url):
-    print("here", url)
-    with async_playwright() as p:
-        print("creating browser")
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
-        print("creating page")
+async def resolve_with_playwright_async(url):
+    logger.info("Starting resolve_with_playwright_async for URL: %s", url)
+    async with async_playwright() as p:
+        logger.info("Creating browser")
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        logger.info("Creating page")
         page = await browser.new_page()
-        
-        # Optionally block resources that aren't needed to speed up loading.
+
         async def block_resource(route, request):
             if request.resource_type in ["image", "stylesheet", "font"]:
                 await route.abort()
             else:
                 await route.continue_()
+
         await page.route("**/*", block_resource)
-        
         try:
-            print("Navigating to url", url)
-            # Use a faster waiting criterion and a shorter timeout.
+            logger.info("Navigating to URL: %s", url)
             await page.goto(url, wait_until="networkidle", timeout=15000)
-            # Wait a bit for any possible redirect (adjust if necessary)
             await page.wait_for_timeout(1000)
-            print("went to page")
+            logger.info("Navigation complete. Current page URL: %s", page.url)
         except Exception as e:
-            print(f"Error during page.goto: {e}")
-            # Optionally, you could try a fallback here
+            logger.error("Error during page.goto: %s", e)
         final_url = page.url
         await browser.close()
         return final_url
+
+def resolve_with_playwright(url):
+    """
+    Synchronously run the asynchronous resolve_with_playwright_async function.
+    Uses WindowsProactorEventLoopPolicy() for Windows if needed.
+    """
+    try:
+        if os.name == 'nt':
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        result = asyncio.run(resolve_with_playwright_async(url))
+        return result
+    except Exception as e:
+        logger.error("Error running async Playwright: %s", e)
+        return None
 
 def fetch_full_article_text(row):
     real_url = row.get("url")
