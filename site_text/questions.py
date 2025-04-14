@@ -65,14 +65,16 @@ IRON_YES = [
 
 IRON_NO = [
     "Is this headline about an announcement for a conference or forum, or related event?",
-    "Does this headline indicate the article is about sports or movies?",
+    "Does this headline indicate the article is about sports, movies, drinks, or food?",
     "Does this headline mention new leadership in a company?",
     "Is this headline about net profit or profit results of a company?",
     "Is this headline about a mining product unrelated to iron?",
     "Is this headline about stock market performances or commodity prices?",
-    "Is this headline about politics, trade, or warfare?",
-    "Is this headline about an award that a company has been granted?",
-    "Is this headline about a mine that is opening?"
+    "Is this headline about politics, trade, or warfare, or a commitment?",
+    "Is this headline about an award that is not related to a project?",
+    "Is this headline about a mine that is opening?",
+    "Is this headline about the iron market or the general iron industry?",
+    "Is this headline about workloads, operating margins, exports, bonds, or dispatches?",
     "Is the headline about the release of a company report or financial year results?"
 
 ]

@@ -43,6 +43,7 @@ from services.inoreader import build_df_for_folder, fetch_full_article_text
 from utils.relevant_excerpts import (
     find_top_relevant_texts
 )
+from services.onedrive import upload_file_to_onedrive
 from utils.results import get_output_fname, output_results_excel  
 from services.inoreader import resolve_with_playwright
 from tempfile import TemporaryDirectory
@@ -309,15 +310,7 @@ def main(gpt_analyzer, openai_apikey):
     # Optionally, display or notify the user that the file has been created
     display_output(output_fname)
 
-    # access_token = st.session_state.get("onedrive_token")
-    # if access_token:
-    #     onedrive_filename = "results.xlsx"
-    #     result = upload_file_to_onedrive(access_token, output_fname, onedrive_filename)
-    #     if result:
-    #         st.success("Results successfully sent to OneDrive!")
-    #     else:
-    #         st.error("OneDrive upload failed.")
-
+    
     # Create a container for output messages.
 
     
@@ -343,8 +336,6 @@ if __name__ == "__main__":
             st.set_page_config(
                 layout="wide", page_title="AI Headline Processor", page_icon=logo_path
             )
-            # if "onedrive_token" not in st.session_state or not st.session_state["onedrive_token"]:
-            #     display_onedrive_login()
             load_header()
             
             _, centered_div, _ = st.columns([1, 3, 1])

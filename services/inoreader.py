@@ -25,6 +25,8 @@ def fetch_inoreader_articles(folder_name):
     access_token = st.session_state["access_token"]
     if not access_token:
         return []
+
+
     
     # Compute the Unix timestamp for one week ago.
     one_week_ago = int(time.time()) - 7 * 24 * 60 * 60
@@ -65,6 +67,7 @@ def fetch_inoreader_articles(folder_name):
             break
             
     return articles
+
 
 
 def build_df_for_folder(folder_name):
