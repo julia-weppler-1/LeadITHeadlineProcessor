@@ -6,7 +6,7 @@ from utils.read_json import parse_inoreader_feed
 from newspaper import Article
 import re
 import urllib.parse
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 
 def fetch_inoreader_articles(folder_name):
@@ -67,32 +67,34 @@ def build_df_for_folder(folder_name):
     df = parse_inoreader_feed(response)
     return(df)
 
-def resolve_with_playwright(url):
+async def resolve_with_playwright(url):
     print("here", url)
-    with sync_playwright() as p:
+    with async_playwright() as p:
         print("creating browser")
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         print("creating page")
-        page = browser.new_page()
+        page = await browser.new_page()
         
         # Optionally block resources that aren't needed to speed up loading.
-        def block_resource(route, request):
+        async def block_resource(route, request):
             if request.resource_type in ["image", "stylesheet", "font"]:
-                return route.abort()
-            return route.continue_()
-        page.route("**/*", block_resource)
+                await route.abort()
+            else:
+                await route.continue_()
+        await page.route("**/*", block_resource)
         
         try:
+            print("Navigating to url", url)
             # Use a faster waiting criterion and a shorter timeout.
-            page.goto(url, wait_until="networkidle", timeout=15000)
+            await page.goto(url, wait_until="networkidle", timeout=15000)
             # Wait a bit for any possible redirect (adjust if necessary)
-            page.wait_for_timeout(1000)
+            await page.wait_for_timeout(1000)
             print("went to page")
         except Exception as e:
             print(f"Error during page.goto: {e}")
             # Optionally, you could try a fallback here
         final_url = page.url
-        browser.close()
+        await browser.close()
         return final_url
 
 def fetch_full_article_text(row):
