@@ -8,6 +8,9 @@ import re
 import urllib.parse
 from playwright.async_api import async_playwright
 import logging
+import os
+import asyncio
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
