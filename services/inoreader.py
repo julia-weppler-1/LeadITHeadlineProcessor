@@ -71,7 +71,7 @@ def resolve_with_playwright(url):
     print("here", url)
     with sync_playwright() as p:
         print("creating browser")
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         print("creating page")
         page = browser.new_page()
         
@@ -96,8 +96,6 @@ def resolve_with_playwright(url):
         return final_url
 
 def fetch_full_article_text(row):
-    # Try to get URL from summary content first
-    print("fetching article")
     real_url = row.get("url")
     #real_url = resolve_with_playwright(ino_url)
     # Fallback to provided URL if summary doesn't help

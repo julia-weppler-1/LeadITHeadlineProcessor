@@ -245,7 +245,6 @@ def main(gpt_analyzer, openai_apikey):
         target_questions = CEMENT_NO
     else:
         target_questions = []  # or some default
-    print("Target q's", target_questions)
     # Assuming your DataFrame of articles is in `headlines` and you have run_on_full_text defined
     relevance_df = query_gpt_for_relevance_iterative(
         gpt_analyzer,

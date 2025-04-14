@@ -65,7 +65,6 @@ def query_gpt_for_relevance(
             query = f'Please respond with only "yes" or "no". Is this relevant to "{var_name}", given "{var_desc}"?\n\nContent:\n"""{row["text_column"]}"""'
             resp_fmt = gpt_analyzer.resp_format_type()
             response = fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text)
-            logger.info("Response: %s", response)
             # Ensure response is stripped and standardized
             response_cleaned = response.strip().lower().translate(str.maketrans('', '', string.punctuation))
             if response_cleaned not in ["yes", "no"]:
@@ -97,8 +96,8 @@ def query_gpt_for_relevance_iterative(gpt_analyzer, df, target_questions, run_on
             )
             resp_fmt = gpt_analyzer.resp_format_type()
             response = fetch_variable_info(gpt_client, gpt_model, query, resp_fmt, run_on_full_text)
+            logger.info("Response: %s", response)
             response_cleaned = response.strip().lower().translate(str.maketrans('', '', string.punctuation))
-            print(response_cleaned)
             if response_cleaned not in ["yes", "no"]:
                 response_cleaned = "no"
             if response_cleaned == "yes":
@@ -137,7 +136,7 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
     
     Returns a dictionary with all keys. Missing details are returned as empty strings.
     """
-    print("Inside detail module")
+    logger.info("Inside detail module")
     tech_list_str = ", ".join(steel_tech_list)
     
     # --- First round: Core details ---
@@ -163,7 +162,6 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
             temperature=0,
             messages=msgs_core,
         )
-        print("MODEL RESP (core):", response_core)
         output_core = response_core.choices[0].message.content.strip()
         if output_core.startswith("```json"):
             output_core = output_core[len("```json"):].strip()
@@ -171,7 +169,7 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
             output_core = output_core[:-3].strip()
         core_details = json.loads(output_core)
     except Exception as e:
-        print(f"Error extracting core project details: {e}")
+        logger.info(f"Error extracting core project details: {e}")
         core_details = {}
     
     # Ensure that all core keys are present.
@@ -207,7 +205,6 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
                 temperature=0,
                 messages=msgs_additional,
             )
-            print("MODEL RESP (additional):", response_additional)
             output_additional = response_additional.choices[0].message.content.strip()
             if output_additional.startswith("```json"):
                 output_additional = output_additional[len("```json"):].strip()
@@ -215,7 +212,7 @@ def query_gpt_for_project_details(gpt_client, gpt_model, article_text, steel_tec
                 output_additional = output_additional[:-3].strip()
             additional_details = json.loads(output_additional)
         except Exception as e:
-            print(f"Error extracting additional project details: {e}")
+            logger.info(f"Error extracting additional project details: {e}")
             additional_details = {}
         
         for key in ['company', 'partners', 'continent', 'country', 'project_status']:
