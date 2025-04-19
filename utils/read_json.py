@@ -81,8 +81,6 @@ def parse_inoreader_feed(json_data):
         return pd.DataFrame()
 
     articles = []
-    print("Here")
-    print(json_data)
     for item in json_data:
         if not isinstance(item, dict):
             print("Warning: Skipping invalid item (not a dictionary).")

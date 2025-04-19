@@ -29,15 +29,12 @@ from interface import (
     display_output,
     get_user_inputs,
     load_header,
-    display_onedrive_login
-    # display_onedrive_auth
+
 )
 from tabs.about import about_tab
 from tabs.faq import faq_tab
 from services.query_gpt import new_openai_session, query_gpt_for_relevance, query_gpt_for_relevance_iterative, query_gpt_for_project_details
 from site_text.questions import STEEL_NO, IRON_NO, STEEL_IRON_TECH, CEMENT_NO, CEMENT_TECH
-from utils.read_pdf import extract_text_chunks_from_pdf
-from utils.read_docx import extract_text_chunks_from_docx
 from utils.read_json import parse_json_feed
 from services.inoreader import build_df_for_folder, fetch_full_article_text
 from utils.relevant_excerpts import (
@@ -63,23 +60,6 @@ def get_resource_path(relative_path):
     """
     return relative_path
 
-def extract_text_chunks(file_path, max_chunk_size):
-    """
-    Extracts text chunks from a file (PDF or DOCX).
-
-    Args:
-        file_path (str): The path to the file.
-        max_chunk_size (int): The maximum size of each text chunk.
-
-    Returns:
-        list: A list of dictionaries containing text chunks, number of pages, character count, and section number.
-    """
-    if file_path.lower().endswith(".pdf"):
-        return extract_text_chunks_from_pdf(file_path, max_chunk_size)
-    elif file_path.lower().endswith(".docx"):
-        return extract_text_chunks_from_docx(file_path, max_chunk_size)
-    else:
-        return [{"error": f"Unsupported file format: {file_path}"}]
 def extract_news_doc_info(
     gpt_analyzer,
     text_embeddings,
